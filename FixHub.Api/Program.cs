@@ -58,6 +58,7 @@ builder.Services
     .AddJwtBearer(options =>
     {
         options.MapInboundClaims = false;
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -70,6 +71,30 @@ builder.Services
             ClockSkew = TimeSpan.Zero,
             NameClaimType = "sub",
             RoleClaimType = "role"
+        };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async ctx =>
+            {
+                var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
+
+                if (!int.TryParse(ctx.Principal?.FindFirst("sub")?.Value, out var userId))
+                {
+                    ctx.Fail("Некорректный токен");
+                    return;
+                }
+
+                var blocked = await db.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == userId)
+                    .Select(u => (bool?)u.IsBlocked)
+                    .FirstOrDefaultAsync();
+
+                // null: пользователя нет, true: заблокирован
+                if (blocked != false)
+                    ctx.Fail("Пользователь заблокирован или не найден");
+            }
         };
     });
 
