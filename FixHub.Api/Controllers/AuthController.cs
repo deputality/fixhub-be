@@ -16,12 +16,18 @@ public class AuthController : ControllerBase
     private readonly AppDbContext _db;
     private readonly IPasswordHasher<User> _hasher;
     private readonly ITokenService _tokens;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(AppDbContext db, IPasswordHasher<User> hasher, ITokenService tokens)
+    public AuthController(
+        AppDbContext db,
+        IPasswordHasher<User> hasher,
+        ITokenService tokens,
+        ILogger<AuthController> logger)
     {
         _db = db;
         _hasher = hasher;
         _tokens = tokens;
+        _logger = logger;
     }
 
     [HttpPost("register")]
@@ -47,6 +53,8 @@ public class AuthController : ControllerBase
         _db.Users.Add(user);
         await _db.SaveChangesAsync();
 
+        _logger.LogInformation("Зарегистрирован пользователь {UserId} с ролью {Role}", user.Id, user.Role);
+
         return Ok(BuildResponse(user));
     }
 
@@ -57,16 +65,26 @@ public class AuthController : ControllerBase
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
 
         if (user == null)
+        {
+            _logger.LogWarning("Неудачная попытка входа: {Email}", email);
             return Unauthorized(new { error = "Неверный email или пароль" });
+        }
 
         var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
         if (result == PasswordVerificationResult.Failed)
+        {
+            _logger.LogWarning("Неудачная попытка входа: {Email}", email);
             return Unauthorized(new { error = "Неверный email или пароль" });
+        }
 
         if (user.IsBlocked)
+        {
+            _logger.LogWarning("Попытка входа заблокированного пользователя {UserId}", user.Id);
             return StatusCode(StatusCodes.Status403Forbidden,
                 new { error = "Учётная запись заблокирована" });
+        }
 
+        _logger.LogInformation("Вход пользователя {UserId}", user.Id);
         return Ok(BuildResponse(user));
     }
 

@@ -13,10 +13,12 @@ namespace FixHub.Api.Controllers;
 public class AdminUsersController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly ILogger<AdminUsersController> _logger;
 
-    public AdminUsersController(AppDbContext db)
+    public AdminUsersController(AppDbContext db, ILogger<AdminUsersController> logger)
     {
         _db = db;
+        _logger = logger;
     }
 
     [HttpGet]
@@ -82,6 +84,11 @@ public class AdminUsersController : ControllerBase
 
         user.IsBlocked = blocked;
         await _db.SaveChangesAsync();
+
+        _logger.LogWarning("Администратор {AdminId} {Action} пользователя {UserId}",
+            User.FindFirst("sub")?.Value,
+            blocked ? "заблокировал" : "разблокировал",
+            user.Id);
 
         return Ok(new AdminUserDto
         {

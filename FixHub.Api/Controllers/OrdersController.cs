@@ -13,10 +13,12 @@ namespace FixHub.Api.Controllers;
 public class OrdersController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly ILogger<OrdersController> _logger;
 
-    public OrdersController(AppDbContext db)
+    public OrdersController(AppDbContext db, ILogger<OrdersController> logger)
     {
         _db = db;
+        _logger = logger;
     }
 
     private int CurrentUserId => int.Parse(User.FindFirst("sub")!.Value);
@@ -123,6 +125,12 @@ public class OrdersController : ControllerBase
 
         await _db.SaveChangesAsync();
         await tx.CommitAsync();
+
+        _logger.LogInformation(
+            "Клиент {ClientId} оформил заказы {OrderIds} на сумму {Total}",
+            userId,
+            string.Join(", ", orders.Select(o => o.Id)),
+            orders.Sum(o => o.TotalAmount));
 
         var ids = orders.Select(o => o.Id).ToList();
         var result = await _db.Orders
@@ -305,6 +313,10 @@ public class OrdersController : ControllerBase
 
         await _db.SaveChangesAsync();
         await tx.CommitAsync();
+
+        _logger.LogInformation(
+            "Заказ {OrderId}: статус {From} -> {To}, изменил пользователь {UserId}",
+            id, from, to, userId);
 
         var dto = await _db.Orders.AsNoTracking()
             .Where(o => o.Id == id)
