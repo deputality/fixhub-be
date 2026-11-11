@@ -2,6 +2,7 @@
 using FixHub.Api.Data;
 using FixHub.Api.DTOs;
 using FixHub.Api.Models;
+using FixHub.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -248,36 +249,35 @@ public class OrdersController : ControllerBase
     [Authorize(Roles = "Client")]
     [HttpPost("{id:int}/cancel")]
     public Task<ActionResult<OrderDto>> Cancel(int id) =>
-        ChangeStatus(id, OrderStatus.New, OrderStatus.Cancelled, asClient: true);
+        ChangeStatus(id, OrderStatus.Cancelled, OrderActor.Client);
 
     [Authorize(Roles = "Performer")]
     [HttpPost("{id:int}/confirm")]
     public Task<ActionResult<OrderDto>> Confirm(int id) =>
-        ChangeStatus(id, OrderStatus.New, OrderStatus.Confirmed, asClient: false);
+        ChangeStatus(id, OrderStatus.Confirmed, OrderActor.Performer);
 
     [Authorize(Roles = "Performer")]
     [HttpPost("{id:int}/reject")]
     public Task<ActionResult<OrderDto>> Reject(int id) =>
-        ChangeStatus(id, OrderStatus.New, OrderStatus.Cancelled, asClient: false);
+        ChangeStatus(id, OrderStatus.Cancelled, OrderActor.Performer);
 
     [Authorize(Roles = "Performer")]
     [HttpPost("{id:int}/start")]
     public Task<ActionResult<OrderDto>> Start(int id) =>
-        ChangeStatus(id, OrderStatus.Confirmed, OrderStatus.InProgress, asClient: false);
+        ChangeStatus(id, OrderStatus.InProgress, OrderActor.Performer);
 
     [Authorize(Roles = "Performer")]
     [HttpPost("{id:int}/complete")]
     public Task<ActionResult<OrderDto>> Complete(int id) =>
-        ChangeStatus(id, OrderStatus.InProgress, OrderStatus.Completed, asClient: false);
+        ChangeStatus(id, OrderStatus.Completed, OrderActor.Performer);
 
-    private async Task<ActionResult<OrderDto>> ChangeStatus(
-        int id, OrderStatus from, OrderStatus to, bool asClient)
+    private async Task<ActionResult<OrderDto>> ChangeStatus(int id, OrderStatus to, OrderActor actor)
     {
         var userId = CurrentUserId;
 
         // чужой заказ для пользователя «не существует»
         var q = _db.Orders.Where(o => o.Id == id);
-        q = asClient
+        q = actor == OrderActor.Client
             ? q.Where(o => o.ClientId == userId)
             : q.Where(o => o.PerformerId == userId);
 
@@ -286,10 +286,13 @@ public class OrdersController : ControllerBase
         if (current == null)
             return NotFound(new { error = "Заказ не найден" });
 
-        if (current != from)
+        var from = current.Value;
+
+        // правила переходов хранятся в одном месте и покрыты unit-тестами
+        if (!OrderStatusRules.CanTransition(from, to, actor))
             return Conflict(new
             {
-                error = $"Нельзя перевести заказ из статуса {current} в статус {to}"
+                error = $"Нельзя перевести заказ из статуса {from} в статус {to}"
             });
 
         await using var tx = await _db.Database.BeginTransactionAsync();
