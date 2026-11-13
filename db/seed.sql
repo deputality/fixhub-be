@@ -216,6 +216,95 @@ BEGIN
         (v_order, NULL,  'New',       c2, NOW() - INTERVAL '2 days'),
         (v_order, 'New', 'Confirmed', m2, NOW() - INTERVAL '1 day');
 END $$;
+-- ---------------------------------------------------------------------------
+-- Ещё выполненные заказы (для отзывов)
+-- ---------------------------------------------------------------------------
+DO $$
+DECLARE
+    c1 int; c2 int;
+    m1 int; m2 int; m3 int;
+    v_order int;
+BEGIN
+    SELECT "Id" INTO c1 FROM "Users" WHERE "Email" = 'client1@fixhub.test';
+    SELECT "Id" INTO c2 FROM "Users" WHERE "Email" = 'client2@fixhub.test';
+    SELECT "Id" INTO m1 FROM "Users" WHERE "Email" = 'master1@fixhub.test';
+    SELECT "Id" INTO m2 FROM "Users" WHERE "Email" = 'master2@fixhub.test';
+    SELECT "Id" INTO m3 FROM "Users" WHERE "Email" = 'master3@fixhub.test';
+
+    -- Заказ 6: выполнен (клиент 2, мастер 3)
+    INSERT INTO "Orders" ("ClientId", "PerformerId", "Status", "TotalAmount", "Address", "ContactName", "ContactPhone", "CreatedAt")
+    VALUES (c2, m3, 'Completed', 0, 'Минск, пр. Независимости, 10, кв. 12', 'Павел Орлов', '+375291110002', NOW() - INTERVAL '12 days')
+    RETURNING "Id" INTO v_order;
+
+    INSERT INTO "OrderItems" ("OrderId", "ServiceId", "ServiceTitle", "UnitPrice", "Quantity", "DesiredDate", "Comment")
+    SELECT v_order, "Id", "Title", "Price", 1, CURRENT_DATE - 10, NULL
+    FROM "Services" WHERE "Title" = 'Семейная фотосессия';
+    INSERT INTO "OrderItems" ("OrderId", "ServiceId", "ServiceTitle", "UnitPrice", "Quantity", "DesiredDate", "Comment")
+    SELECT v_order, "Id", "Title", "Price", 1, CURRENT_DATE - 10, NULL
+    FROM "Services" WHERE "Title" = 'Настройка компьютера';
+
+    UPDATE "Orders" SET "TotalAmount" = (SELECT SUM("UnitPrice" * "Quantity") FROM "OrderItems" WHERE "OrderId" = v_order)
+    WHERE "Id" = v_order;
+
+    INSERT INTO "OrderStatusHistory" ("OrderId", "FromStatus", "ToStatus", "ChangedByUserId", "ChangedAt") VALUES
+        (v_order, NULL,         'New',        c2, NOW() - INTERVAL '12 days'),
+        (v_order, 'New',        'Confirmed',  m3, NOW() - INTERVAL '11 days'),
+        (v_order, 'Confirmed',  'InProgress', m3, NOW() - INTERVAL '10 days'),
+        (v_order, 'InProgress', 'Completed',  m3, NOW() - INTERVAL '10 days' + INTERVAL '3 hours');
+
+    -- Заказ 7: выполнен (клиент 1, мастер 2)
+    INSERT INTO "Orders" ("ClientId", "PerformerId", "Status", "TotalAmount", "Address", "ContactName", "ContactPhone", "CreatedAt")
+    VALUES (c1, m2, 'Completed', 0, 'Минск, ул. Тестовая, 1, кв. 5', 'Анна Климова', '+375291110001', NOW() - INTERVAL '10 days')
+    RETURNING "Id" INTO v_order;
+
+    INSERT INTO "OrderItems" ("OrderId", "ServiceId", "ServiceTitle", "UnitPrice", "Quantity", "DesiredDate", "Comment")
+    SELECT v_order, "Id", "Title", "Price", 3, CURRENT_DATE - 8, NULL
+    FROM "Services" WHERE "Title" = 'Мытьё окон';
+
+    UPDATE "Orders" SET "TotalAmount" = (SELECT SUM("UnitPrice" * "Quantity") FROM "OrderItems" WHERE "OrderId" = v_order)
+    WHERE "Id" = v_order;
+
+    INSERT INTO "OrderStatusHistory" ("OrderId", "FromStatus", "ToStatus", "ChangedByUserId", "ChangedAt") VALUES
+        (v_order, NULL,         'New',        c1, NOW() - INTERVAL '10 days'),
+        (v_order, 'New',        'Confirmed',  m2, NOW() - INTERVAL '9 days'),
+        (v_order, 'Confirmed',  'InProgress', m2, NOW() - INTERVAL '8 days'),
+        (v_order, 'InProgress', 'Completed',  m2, NOW() - INTERVAL '8 days' + INTERVAL '2 hours');
+
+    -- Заказ 8: выполнен (клиент 2, мастер 1)
+    INSERT INTO "Orders" ("ClientId", "PerformerId", "Status", "TotalAmount", "Address", "ContactName", "ContactPhone", "CreatedAt")
+    VALUES (c2, m1, 'Completed', 0, 'Минск, пр. Независимости, 10, кв. 12', 'Павел Орлов', '+375291110002', NOW() - INTERVAL '9 days')
+    RETURNING "Id" INTO v_order;
+
+    INSERT INTO "OrderItems" ("OrderId", "ServiceId", "ServiceTitle", "UnitPrice", "Quantity", "DesiredDate", "Comment")
+    SELECT v_order, "Id", "Title", "Price", 1, CURRENT_DATE - 7, NULL
+    FROM "Services" WHERE "Title" = 'Ремонт стиральных машин';
+
+    UPDATE "Orders" SET "TotalAmount" = (SELECT SUM("UnitPrice" * "Quantity") FROM "OrderItems" WHERE "OrderId" = v_order)
+    WHERE "Id" = v_order;
+
+    INSERT INTO "OrderStatusHistory" ("OrderId", "FromStatus", "ToStatus", "ChangedByUserId", "ChangedAt") VALUES
+        (v_order, NULL,         'New',        c2, NOW() - INTERVAL '9 days'),
+        (v_order, 'New',        'Confirmed',  m1, NOW() - INTERVAL '8 days'),
+        (v_order, 'Confirmed',  'InProgress', m1, NOW() - INTERVAL '7 days'),
+        (v_order, 'InProgress', 'Completed',  m1, NOW() - INTERVAL '7 days' + INTERVAL '2 hours');
+END $$;
+
+-- ---------------------------------------------------------------------------
+-- Отзывы к выполненным заказам (один отзыв скрыт администратором как спам)
+-- ---------------------------------------------------------------------------
+INSERT INTO "Reviews" ("OrderItemId", "ClientId", "ServiceId", "PerformerId", "Rating", "Text", "IsHidden", "CreatedAt")
+SELECT oi."Id", o."ClientId", oi."ServiceId", o."PerformerId", v.rating, v.txt, v.hidden, v.created
+FROM (VALUES
+    ('client1@fixhub.test', 'Ремонт стиральных машин', 5, 'Приехал вовремя, починил за час, всё объяснил.',              FALSE, NOW() - INTERVAL '11 days'),
+    ('client1@fixhub.test', 'Замена смесителя',        4, 'Сделал аккуратно, но пришлось немного подождать.',            FALSE, NOW() - INTERVAL '11 days'),
+    ('client2@fixhub.test', 'Ремонт стиральных машин', 4, 'Быстро нашёл причину поломки, машина работает как новая.',     FALSE, NOW() - INTERVAL '6 days'),
+    ('client2@fixhub.test', 'Семейная фотосессия',     5, 'Отличные кадры, дети были в восторге.',                       FALSE, NOW() - INTERVAL '9 days'),
+    ('client2@fixhub.test', 'Настройка компьютера',    2, 'Долго возился, пришлось звонить повторно.',                    FALSE, NOW() - INTERVAL '9 days'),
+    ('client1@fixhub.test', 'Мытьё окон',              1, 'Купите дёшево, переходите по ссылке!!!',                       TRUE,  NOW() - INTERVAL '7 days')
+) AS v(client, title, rating, txt, hidden, created)
+JOIN "Users" cl      ON cl."Email" = v.client
+JOIN "Orders" o      ON o."ClientId" = cl."Id" AND o."Status" = 'Completed'
+JOIN "OrderItems" oi ON oi."OrderId" = o."Id" AND oi."ServiceTitle" = v.title;
 
 COMMIT;
 
@@ -228,4 +317,5 @@ UNION ALL SELECT 'Services',           COUNT(*) FROM "Services"
 UNION ALL SELECT 'CartItems',          COUNT(*) FROM "CartItems"
 UNION ALL SELECT 'Orders',             COUNT(*) FROM "Orders"
 UNION ALL SELECT 'OrderItems',         COUNT(*) FROM "OrderItems"
-UNION ALL SELECT 'OrderStatusHistory', COUNT(*) FROM "OrderStatusHistory";
+UNION ALL SELECT 'OrderStatusHistory', COUNT(*) FROM "OrderStatusHistory"
+UNION ALL SELECT 'Reviews',            COUNT(*) FROM "Reviews";

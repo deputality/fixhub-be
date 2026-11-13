@@ -42,6 +42,12 @@ public class ServiceDto
 
     public int PerformerId { get; set; }
     public string PerformerName { get; set; } = null!;
+
+    // Рейтинг считается по нескрытым отзывам; null, если отзывов ещё нет
+    public decimal? Rating { get; set; }
+    public int ReviewCount { get; set; }
+    public decimal? PerformerRating { get; set; }
+    public int PerformerReviewCount { get; set; }
 }
 
 // Способы сортировки каталога
@@ -50,7 +56,8 @@ public enum CatalogSort
     Newest,
     PriceAsc,
     PriceDesc,
-    TitleAsc
+    TitleAsc,
+    RatingDesc
 }
 
 // Параметры поиска в каталоге (приходят в адресе запроса)
@@ -66,6 +73,9 @@ public class CatalogQuery
 
     [Range(0, 1000000)]
     public decimal? MaxPrice { get; set; }
+
+    [Range(1, 5)]
+    public decimal? MinRating { get; set; }
 
     public CatalogSort Sort { get; set; } = CatalogSort.Newest;
 
