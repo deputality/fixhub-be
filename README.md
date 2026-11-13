@@ -4,141 +4,171 @@
 
 Фронтенд находится в отдельном репозитории: fixhub-fe.
 
-Технологии
-C#, ASP.NET Core Web API (.NET 9)
-Entity Framework Core 9 + Npgsql
-PostgreSQL 16 (в Docker)
-Аутентификация: JWT, пароли хранятся в виде хеша (PasswordHasher)
-Документация API: Swagger (Swashbuckle)
-Контроль версий: Git
-Требования
-.NET SDK 9
-Docker Desktop
-Инструмент миграций EF Core: dotnet tool install --global dotnet-ef
-Запуск
-# 1. База данных
+## Технологии
 
-Создай файл docker-compose.yml (например, в папке выше репозитория) и запусти PostgreSQL:
+- C#, ASP.NET Core Web API (.NET 9)
+- Entity Framework Core 9 + Npgsql
+- PostgreSQL 16 (в Docker)
+- Аутентификация: JWT, пароли хранятся в виде хеша (PasswordHasher)
+- Логирование: Serilog (консоль и файлы `logs/`)
+- Документация API: Swagger (Swashbuckle)
+- Тесты: xUnit (unit и интеграционные)
+- Контейнеризация: Docker, Docker Compose
 
-yaml
-services:
-  db:
-    image: postgres:16
-    container_name: fixhub-db
-    environment:
-      POSTGRES_USER: fixhub
-      POSTGRES_PASSWORD: fixhub123
-      POSTGRES_DB: fixhub
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+## Быстрый старт (Docker)
 
-volumes:
-  pgdata:
-docker compose up -d
-docker ps
+Нужен только Docker Desktop. Из корня репозитория:
 
-В списке должен быть контейнер fixhub-db со статусом Up. Данные хранятся в volume и сохраняются после перезапуска.
+```
+docker compose up --build -d
+```
 
-# 2. Настройки
+Compose поднимает PostgreSQL и API. При старте приложение само применяет миграции и создаёт администратора. Проверить состояние:
 
-Настройки лежат в FixHub.Api/appsettings.json:
+```
+docker compose ps
+docker compose logs -f api
+```
 
-Раздел	Назначение
-ConnectionStrings:Default	строка подключения к PostgreSQL
-Jwt	ключ подписи, издатель, аудитория, срок жизни токена (минуты)
-Admin	email и пароль администратора, создаваемого при первом запуске
+Swagger: http://localhost:8080/swagger
 
-Значения в репозитории предназначены только для разработки. Для реального развёртывания ключ JWT и пароль администратора нужно хранить вне репозитория (переменные окружения или user-secrets).
+### Тестовые данные
 
-# 3. Миграции и запуск
+Скрипт `db/seed.sql` рассчитан на пустую базу (после миграций). Загрузка:
+
+```
+docker compose exec -T db psql -U fixhub -d fixhub -v ON_ERROR_STOP=1 < db/seed.sql
+```
+
+В базе появятся 7 пользователей, 7 категорий, 10 услуг, 5 заказов в разных статусах и 2 позиции в корзине.
+
+| Роль | Email | Пароль |
+|---|---|---|
+| Админ | admin@fixhub.local | Admin12345 |
+| Клиент | client1@fixhub.test | Test12345 |
+| Мастер | master1@fixhub.test | Test12345 |
+| Заблокированный клиент | blocked@fixhub.test | Test12345 |
+
+Остальные учётные записи смотри в `db/seed.sql`.
+
+### Остановка
+
+```
+docker compose down        # остановить, данные сохраняются
+docker compose down -v     # остановить и удалить данные базы
+```
+
+### Настройка через переменные окружения
+
+| Переменная | По умолчанию | Назначение |
+|---|---|---|
+| `POSTGRES_PASSWORD` | `fixhub123` | пароль базы данных |
+| `JWT_KEY` | ключ из appsettings.json | ключ подписи JWT |
+| `ADMIN_PASSWORD` | `Admin12345` | пароль администратора, создаваемого при первом запуске |
+
+Значения по умолчанию подходят только для разработки. Для реального развёртывания задай свои через файл `.env` рядом с `docker-compose.yml`.
+
+## Запуск для разработки (без контейнера API)
+
+Требования: .NET SDK 9, Docker Desktop, инструмент миграций `dotnet tool install --global dotnet-ef`.
+
+```
+docker compose up -d db
 cd FixHub.Api
 dotnet ef database update
 dotnet run
+```
 
-Миграции автоматически при старте не применяются, их нужно выполнить командой выше. Приложение слушает адреса https://localhost:7173 и http://localhost:5239.
+Приложение слушает адреса https://localhost:7173 и http://localhost:5239. Swagger: https://localhost:7173/swagger.
 
-# Swagger: https://localhost:7173/swagger
+Настройки лежат в `FixHub.Api/appsettings.json`:
 
-При первом запуске создаётся администратор с данными из раздела Admin.
+| Раздел | Назначение |
+|---|---|
+| `ConnectionStrings:Default` | строка подключения к PostgreSQL |
+| `Jwt` | ключ подписи, издатель, аудитория, срок жизни токена (минуты) |
+| `Admin` | email и пароль администратора, создаваемого при первом запуске |
+| `Database:MigrateOnStartup` | применять миграции при старте (в Docker включено) |
 
-Роли
-Роль	Возможности
-Гость	просмотр категорий, регистрация, вход
-Client	профиль, просмотр данных о себе
-Performer	создание, изменение и скрытие собственных услуг
-Admin	управление категориями
+## Тесты
 
-Регистрация доступна для ролей Client и Performer. Администратор создаётся только автоматически.
+```
+docker compose up -d db
+dotnet test FixHub.sln
+```
 
-# API
+Всего 51 тест: 23 unit-теста и 28 интеграционных (каталог, корзина, заказы, авторизация). Интеграционные тесты работают на временной базе, рабочая база не затрагивается. Для них должен быть запущен PostgreSQL.
 
-Для защищённых методов нужен заголовок Authorization: Bearer <token>. В Swagger токен вставляется (без слова Bearer и без кавычек) через кнопку Authorize.
+## Роли
 
-Аутентификация
-Метод	Адрес	Доступ
-POST	/api/auth/register	все
-POST	/api/auth/login	все
-GET	/api/auth/me	авторизованные
-Категории
-Метод	Адрес	Доступ
-GET	/api/categories	все
-POST	/api/categories	Admin
-PUT	/api/categories/{id}	Admin
-DELETE	/api/categories/{id}	Admin
+| Роль | Возможности |
+|---|---|
+| Гость | каталог услуг, категории, регистрация, вход |
+| Client | корзина, оформление и отмена заказов, просмотр своих заказов |
+| Performer | свои услуги, обработка заказов, статистика |
+| Admin | категории, пользователи (блокировка), все заказы |
 
-Категорию нельзя удалить, если в ней есть подкатегории или услуги.
+Регистрация доступна для ролей Client и Performer. Администратор создаётся автоматически при первом запуске.
 
-Услуги исполнителя
-Метод	Адрес	Доступ
-GET	/api/performer/services	Performer
-POST	/api/performer/services	Performer
-PUT	/api/performer/services/{id}	Performer
-PATCH	/api/performer/services/{id}/hide	Performer
-PATCH	/api/performer/services/{id}/show	Performer
+## API
 
-Исполнитель видит и меняет только свои услуги: при обращении к чужой услуге API возвращает 404.
+Для защищённых методов нужен заголовок `Authorization: Bearer <token>`. В Swagger токен вставляется (без слова Bearer и без кавычек) через кнопку Authorize. Полный список методов и параметров смотри в Swagger.
 
-Коды ответов
-Код	Значение
-400	неверные данные запроса
-401	нет токена, токен неверный или неверный логин/пароль
-403	недостаточно прав или пользователь заблокирован
-404	объект не найден
-409	конфликт (например, email уже занят)
-Структура проекта
-FixHub.Api/
-  Controllers/   контроллеры API
-  Data/          AppDbContext
-  DTOs/          объекты запросов и ответов
-  Migrations/    миграции EF Core
-  Models/        сущности и перечисления
-  Services/      сервисы (выдача JWT)
-  Program.cs     настройка приложения
-База данных
+| Группа | Адреса |
+|---|---|
+| Аутентификация | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` |
+| Категории | `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` (изменение: Admin) |
+| Каталог | `GET /api/catalog`, `GET /api/catalog/{id}` |
+| Корзина | `GET /api/cart`, `POST /api/cart/items`, `PUT/DELETE /api/cart/items/{id}` |
+| Заказы клиента | `POST /api/orders`, `GET /api/orders/my`, `GET /api/orders/{id}`, `POST /api/orders/{id}/cancel` |
+| Услуги исполнителя | `GET/POST /api/performer/services`, `PUT /api/performer/services/{id}`, `PATCH .../{id}/hide`, `PATCH .../{id}/show` |
+| Заказы исполнителя | `GET /api/performer/orders`, `POST /api/orders/{id}/confirm`, `.../start`, `.../complete`, `.../reject`, `GET /api/performer/stats` |
+| Администратор | `GET /api/admin/users`, `POST /api/admin/users/{id}/block`, `.../unblock`, `GET /api/admin/orders` |
 
-Сущности: User, Category (с вложенностью), Service, CartItem, Order, OrderItem, OrderStatusHistory.
+Заказ проходит статусы: `New` → `Confirmed` → `InProgress` → `Completed`; из `New` его можно отменить (`Cancelled`): клиент через `cancel`, исполнитель через `reject`. Каждый переход записывается в историю. Корзина при оформлении делится на отдельные заказы по исполнителям.
 
-Денежные значения хранятся в типе numeric (decimal), время в UTC.
-Уникальный email пользователя; в корзине уникальная пара (клиент, услуга).
-Индексы по категории и цене услуг, по клиенту и статусу заказов.
-Ограничения: цена не меньше нуля, количество больше нуля.
-Роли и статусы хранятся в виде текста.
-Статус разработки
+Категорию нельзя удалить, если в ней есть подкатегории или услуги. Пользователь видит и меняет только свои данные: при обращении к чужому объекту API возвращает 404.
 
-# Готово:
+### Коды ответов
 
-регистрация, вход, JWT, разграничение прав по ролям;
-создание администратора при старте;
-категории (управление администратором);
-услуги исполнителя (создание, изменение, скрытие и показ).
+| Код | Значение |
+|---|---|
+| 400 | неверные данные запроса |
+| 401 | нет токена, токен неверный или неверный логин/пароль |
+| 403 | недостаточно прав или пользователь заблокирован |
+| 404 | объект не найден |
+| 409 | конфликт (email занят, недопустимый переход статуса заказа) |
 
-# В планах:
+## Структура репозитория
 
-публичный каталог: поиск, фильтры по категории и цене, сортировка, постраничный вывод;
-корзина;
-оформление заказа в одной транзакции, статусы заказа и их история;
-кабинеты клиента, исполнителя и администратора;
-отзывы, уведомления и статистика (дополнительно);
-unit- и интеграционные тесты, ER-диаграмма, SQL-скрипт с тестовыми данными.
+```
+FixHub.Api/        приложение
+  Controllers/     контроллеры API
+  Data/            AppDbContext
+  DTOs/            объекты запросов и ответов
+  Migrations/      миграции EF Core
+  Models/          сущности и перечисления
+  Services/        сервисы
+  Program.cs       настройка приложения
+FixHub.Tests/      unit и интеграционные тесты
+db/seed.sql        тестовые данные
+docs/              ER-диаграмма (er-diagram.md, er-diagram.png)
+Dockerfile         образ API
+docker-compose.yml API + PostgreSQL
+```
+
+## База данных
+
+Сущности: User, Category (с вложенностью), Service, CartItem, Order, OrderItem, OrderStatusHistory. ER-диаграмма: [docs/er-diagram.md](docs/er-diagram.md).
+
+- Денежные значения хранятся в типе numeric (decimal), время в UTC.
+- Уникальный email пользователя; в корзине уникальная пара (клиент, услуга).
+- Индексы по категории и цене услуг, по клиенту и статусу заказов.
+- Ограничения: цена не меньше нуля, количество больше нуля.
+- Роли и статусы хранятся в виде текста.
+
+## Статус разработки
+
+Готово: регистрация, вход, JWT и роли; категории; услуги исполнителя; публичный каталог; корзина; оформление заказа в одной транзакции со статусами и историей; кабинеты клиента, исполнителя и администратора; unit- и интеграционные тесты; ER-диаграмма и тестовые данные; запуск через Docker Compose.
+
+В планах (дополнительно): отзывы, уведомления.

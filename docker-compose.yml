@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16
+    container_name: fixhub-db
+    environment:
+      POSTGRES_USER: fixhub
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fixhub123}
+      POSTGRES_DB: fixhub
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fixhub -d fixhub"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: fixhub-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Development нужен, чтобы работал Swagger
+      ASPNETCORE_ENVIRONMENT: Development
+      Database__MigrateOnStartup: "true"
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=fixhub;Username=fixhub;Password=${POSTGRES_PASSWORD:-fixhub123}"
+      Jwt__Key: ${JWT_KEY:-fixhub-super-secret-key-change-me-0123456789}
+      Admin__Password: ${ADMIN_PASSWORD:-Admin12345}
+    ports:
+      - "8080:8080"
+
+volumes:
+  pgdata:
