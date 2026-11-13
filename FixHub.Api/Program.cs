@@ -167,6 +167,9 @@ try
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        if (builder.Configuration.GetValue<bool>("Database:MigrateOnStartup"))
+            db.Database.Migrate();
         var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher<User>>();
 
         if (!db.Users.Any(u => u.Role == UserRole.Admin))
