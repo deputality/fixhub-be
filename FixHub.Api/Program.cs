@@ -1,4 +1,4 @@
-using System.Text;
+п»їusing System.Text;
 using FixHub.Api.Common;
 using FixHub.Api.Data;
 using FixHub.Api.Models;
@@ -11,7 +11,7 @@ using Microsoft.OpenApi.Models;
 using Serilog;
 using Serilog.Events;
 
-// Временный логгер: ловит ошибки, возникшие до загрузки настроек
+// Р’СЂРµРјРµРЅРЅС‹Р№ Р»РѕРіРіРµСЂ: Р»РѕРІРёС‚ РѕС€РёР±РєРё, РІРѕР·РЅРёРєС€РёРµ РґРѕ Р·Р°РіСЂСѓР·РєРё РЅР°СЃС‚СЂРѕРµРє
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console()
     .CreateBootstrapLogger();
@@ -20,17 +20,17 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
-    // Логи: настройки берутся из раздела "Serilog" в appsettings.json
+    // Р›РѕРіРё: РЅР°СЃС‚СЂРѕР№РєРё Р±РµСЂСѓС‚СЃСЏ РёР· СЂР°Р·РґРµР»Р° "Serilog" РІ appsettings.json
     builder.Host.UseSerilog((context, services, configuration) => configuration
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
         .Enrich.FromLogContext());
 
-    // База данных
+    // Р‘Р°Р·Р° РґР°РЅРЅС‹С…
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(builder.Configuration.GetConnectionString("Default")));
 
-    // Контроллеры, единый формат ошибок и Swagger
+    // РљРѕРЅС‚СЂРѕР»Р»РµСЂС‹, РµРґРёРЅС‹Р№ С„РѕСЂРјР°С‚ РѕС€РёР±РѕРє Рё Swagger
     builder.Services.AddControllers(options => options.Filters.Add<ApiErrorResultFilter>())
         .AddJsonOptions(o =>
             o.JsonSerializerOptions.Converters.Add(
@@ -46,7 +46,7 @@ try
             Scheme = "bearer",
             BearerFormat = "JWT",
             In = ParameterLocation.Header,
-            Description = "Вставь JWT-токен (без слова Bearer)"
+            Description = "Р’СЃС‚Р°РІСЊ JWT-С‚РѕРєРµРЅ (Р±РµР· СЃР»РѕРІР° Bearer)"
         });
 
         options.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -65,9 +65,9 @@ try
         });
     });
 
-    // JWT-аутентификация
+    // JWT-Р°СѓС‚РµРЅС‚РёС„РёРєР°С†РёСЏ
     var jwtKey = builder.Configuration["Jwt:Key"]
-        ?? throw new InvalidOperationException("Jwt:Key не задан в настройках");
+        ?? throw new InvalidOperationException("Jwt:Key РЅРµ Р·Р°РґР°РЅ РІ РЅР°СЃС‚СЂРѕР№РєР°С…");
 
     builder.Services
         .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -97,7 +97,7 @@ try
 
                     if (!int.TryParse(ctx.Principal?.FindFirst("sub")?.Value, out var userId))
                     {
-                        ctx.Fail("Некорректный токен");
+                        ctx.Fail("РќРµРєРѕСЂСЂРµРєС‚РЅС‹Р№ С‚РѕРєРµРЅ");
                         return;
                     }
 
@@ -107,22 +107,22 @@ try
                         .Select(u => (bool?)u.IsBlocked)
                         .FirstOrDefaultAsync();
 
-                    // null: пользователя нет, true: заблокирован
+                    // null: РїРѕР»СЊР·РѕРІР°С‚РµР»СЏ РЅРµС‚, true: Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ
                     if (blocked != false)
-                        ctx.Fail("Пользователь заблокирован или не найден");
+                        ctx.Fail("РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ Р·Р°Р±Р»РѕРєРёСЂРѕРІР°РЅ РёР»Рё РЅРµ РЅР°Р№РґРµРЅ");
                 }
             };
         });
 
     builder.Services.AddAuthorization();
 
-    // Свои сервисы
+    // РЎРІРѕРё СЃРµСЂРІРёСЃС‹
     builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
     builder.Services.AddScoped<ITokenService, TokenService>();
 
     var app = builder.Build();
 
-    // Одна строка в логе на каждый запрос (метод, адрес, код ответа, время)
+    // РћРґРЅР° СЃС‚СЂРѕРєР° РІ Р»РѕРіРµ РЅР° РєР°Р¶РґС‹Р№ Р·Р°РїСЂРѕСЃ (РјРµС‚РѕРґ, Р°РґСЂРµСЃ, РєРѕРґ РѕС‚РІРµС‚Р°, РІСЂРµРјСЏ)
     app.UseSerilogRequestLogging(options =>
     {
         options.GetLevel = (httpContext, elapsed, ex) =>
@@ -133,10 +133,10 @@ try
                     : LogEventLevel.Information;
     });
 
-    // Перехват необработанных исключений: клиенту 500 в едином формате, в лог полная причина
+    // РџРµСЂРµС…РІР°С‚ РЅРµРѕР±СЂР°Р±РѕС‚Р°РЅРЅС‹С… РёСЃРєР»СЋС‡РµРЅРёР№: РєР»РёРµРЅС‚Сѓ 500 РІ РµРґРёРЅРѕРј С„РѕСЂРјР°С‚Рµ, РІ Р»РѕРі РїРѕР»РЅР°СЏ РїСЂРёС‡РёРЅР°
     app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-    // Ответы без тела (401, 403, 404 для несуществующего адреса) тоже в едином формате
+    // РћС‚РІРµС‚С‹ Р±РµР· С‚РµР»Р° (401, 403, 404 РґР»СЏ РЅРµСЃСѓС‰РµСЃС‚РІСѓСЋС‰РµРіРѕ Р°РґСЂРµСЃР°) С‚РѕР¶Рµ РІ РµРґРёРЅРѕРј С„РѕСЂРјР°С‚Рµ
     app.UseStatusCodePages(async statusContext =>
     {
         var http = statusContext.HttpContext;
@@ -163,7 +163,7 @@ try
 
     app.MapControllers();
 
-    // Создание администратора при первом запуске
+    // РЎРѕР·РґР°РЅРёРµ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂР° РїСЂРё РїРµСЂРІРѕРј Р·Р°РїСѓСЃРєРµ
     using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -177,14 +177,14 @@ try
             var admin = new User
             {
                 Email = builder.Configuration["Admin:Email"]!.ToLowerInvariant(),
-                FullName = "Администратор",
+                FullName = "РђРґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂ",
                 Role = UserRole.Admin
             };
             admin.PasswordHash = hasher.HashPassword(admin, builder.Configuration["Admin:Password"]!);
             db.Users.Add(admin);
             db.SaveChanges();
 
-            app.Logger.LogInformation("Создан администратор по умолчанию");
+            app.Logger.LogInformation("РЎРѕР·РґР°РЅ Р°РґРјРёРЅРёСЃС‚СЂР°С‚РѕСЂ РїРѕ СѓРјРѕР»С‡Р°РЅРёСЋ");
         }
     }
 
@@ -192,8 +192,8 @@ try
 }
 catch (Exception ex) when (ex is not HostAbortedException)
 {
-    // HostAbortedException штатно бросает dotnet ef, его в лог не пишем
-    Log.Fatal(ex, "Приложение аварийно завершилось");
+    // HostAbortedException С€С‚Р°С‚РЅРѕ Р±СЂРѕСЃР°РµС‚ dotnet ef, РµРіРѕ РІ Р»РѕРі РЅРµ РїРёС€РµРј
+    Log.Fatal(ex, "РџСЂРёР»РѕР¶РµРЅРёРµ Р°РІР°СЂРёР№РЅРѕ Р·Р°РІРµСЂС€РёР»РѕСЃСЊ");
 }
 finally
 {
