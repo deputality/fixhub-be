@@ -165,7 +165,7 @@ docker-compose.yml API + PostgreSQL
 
 ## База данных
 
-Сущности: User, Category (с вложенностью), Service, CartItem, Order, OrderItem, OrderStatusHistory, Review. ER-диаграмма: [docs/er-diagram.md](docs/fixhub - fixhub - public.png).
+Сущности: User, Category (с вложенностью), Service, CartItem, Order, OrderItem, OrderStatusHistory, Review. ER-диаграмма: [docs/fixhub - fixhub - public.png](docs/fixhub - fixhub - public.png).
 
 - Денежные значения хранятся в типе numeric (decimal), время в UTC.
 - Уникальный email пользователя; в корзине уникальная пара (клиент, услуга).
