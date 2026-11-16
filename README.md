@@ -158,7 +158,7 @@ FixHub.Api/        приложение
   Program.cs       настройка приложения
 FixHub.Tests/      unit и интеграционные тесты
 db/seed.sql        тестовые данные
-docs/              ER-диаграмма (er-diagram.md, er-diagram.png)
+docs/              ER-диаграмма (fixhub - fixhub - public.png)
 Dockerfile         образ API
 docker-compose.yml API + PostgreSQL
 ```
