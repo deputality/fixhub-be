@@ -119,6 +119,7 @@ try
     // Свои сервисы
     builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
     builder.Services.AddScoped<ITokenService, TokenService>();
+    builder.Services.AddScoped<INotificationService, NotificationService>();
 
     var app = builder.Build();
 
