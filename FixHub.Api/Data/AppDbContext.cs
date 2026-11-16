@@ -1,4 +1,4 @@
-﻿using FixHub.Api.Models;
+using FixHub.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace FixHub.Api.Data;
@@ -14,6 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<OrderStatusHistory> OrderStatusHistory => Set<OrderStatusHistory>();
+    public DbSet<Review> Reviews => Set<Review>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -146,6 +147,42 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
 
             e.HasIndex(x => x.OrderId);
+        });
+
+        b.Entity<Review>(e =>
+        {
+            e.Property(x => x.Text).HasMaxLength(2000).IsRequired();
+
+            // Один отзыв на одну позицию заказа
+            e.HasIndex(x => x.OrderItemId).IsUnique();
+
+            // Для расчёта рейтинга услуги и исполнителя
+            e.HasIndex(x => new { x.ServiceId, x.IsHidden });
+            e.HasIndex(x => new { x.PerformerId, x.IsHidden });
+            e.HasIndex(x => x.ClientId);
+
+            e.HasOne(x => x.OrderItem)
+                .WithMany()
+                .HasForeignKey(x => x.OrderItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.Client)
+                .WithMany()
+                .HasForeignKey(x => x.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.Service)
+                .WithMany()
+                .HasForeignKey(x => x.ServiceId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.Performer)
+                .WithMany()
+                .HasForeignKey(x => x.PerformerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // Оценка от 1 до 5
+            e.ToTable(t => t.HasCheckConstraint("CK_Reviews_Rating", "\"Rating\" BETWEEN 1 AND 5"));
         });
     }
 }
