@@ -21,3 +21,10 @@ public enum OrderStatus
     Completed = 4,
     Cancelled = 5
 }
+
+public enum NotificationType
+{
+    NewOrder = 1,
+    OrderStatusChanged = 2,
+    NewReview = 3
+}

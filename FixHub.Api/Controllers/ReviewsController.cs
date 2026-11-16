@@ -15,11 +15,13 @@ public class ReviewsController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly ILogger<ReviewsController> _logger;
+    private readonly INotificationService _notifications;
 
-    public ReviewsController(AppDbContext db, ILogger<ReviewsController> logger)
+    public ReviewsController(AppDbContext db, ILogger<ReviewsController> logger, INotificationService notifications)
     {
         _db = db;
         _logger = logger;
+        _notifications = notifications;
     }
 
     private int CurrentUserId => int.Parse(User.FindFirst("sub")!.Value);
@@ -78,6 +80,14 @@ public class ReviewsController : ControllerBase
             // два одновременных запроса на одну позицию: сработал уникальный индекс
             return Conflict(new { error = "Отзыв на эту позицию уже оставлен" });
         }
+
+        // id отзыва появился только после сохранения, поэтому уведомление сохраняем отдельно
+        _notifications.Add(
+            item.PerformerId,
+            NotificationType.NewReview,
+            $"Новый отзыв с оценкой {review.Rating}",
+            reviewId: review.Id);
+        await _db.SaveChangesAsync();
 
         _logger.LogInformation(
             "Клиент {ClientId} оставил отзыв {ReviewId} на услугу {ServiceId}, оценка {Rating}",

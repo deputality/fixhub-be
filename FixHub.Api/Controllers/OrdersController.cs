@@ -15,11 +15,13 @@ public class OrdersController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly ILogger<OrdersController> _logger;
+    private readonly INotificationService _notifications;
 
-    public OrdersController(AppDbContext db, ILogger<OrdersController> logger)
+    public OrdersController(AppDbContext db, ILogger<OrdersController> logger, INotificationService notifications)
     {
         _db = db;
         _logger = logger;
+        _notifications = notifications;
     }
 
     private int CurrentUserId => int.Parse(User.FindFirst("sub")!.Value);
@@ -123,6 +125,17 @@ public class OrdersController : ControllerBase
 
         _db.Orders.AddRange(orders);
         _db.CartItems.RemoveRange(cart);
+
+        await _db.SaveChangesAsync();
+
+        foreach (var order in orders)
+        {
+            _notifications.Add(
+                order.PerformerId,
+                NotificationType.NewOrder,
+                $"Новый заказ №{order.Id} на сумму {order.TotalAmount:0.##}",
+                order.Id);
+        }
 
         await _db.SaveChangesAsync();
         await tx.CommitAsync();
@@ -281,12 +294,15 @@ public class OrdersController : ControllerBase
             ? q.Where(o => o.ClientId == userId)
             : q.Where(o => o.PerformerId == userId);
 
-        var current = await q.Select(o => (OrderStatus?)o.Status).FirstOrDefaultAsync();
+        // кроме статуса берём обоих участников, чтобы знать, кого уведомить
+        var order = await q
+            .Select(o => new { o.Status, o.ClientId, o.PerformerId })
+            .FirstOrDefaultAsync();
 
-        if (current == null)
+        if (order == null)
             return NotFound(new { error = "Заказ не найден" });
 
-        var from = current.Value;
+        var from = order.Status;
 
         // правила переходов хранятся в одном месте и покрыты unit-тестами
         if (!OrderStatusRules.CanTransition(from, to, actor))
@@ -314,6 +330,10 @@ public class OrdersController : ControllerBase
             ChangedAt = DateTime.UtcNow
         });
 
+        // Если статус меняет исполнитель, уведомляем клиента, и наоборот
+        var receiverId = actor == OrderActor.Client ? order.PerformerId : order.ClientId;
+        _notifications.Add(receiverId, NotificationType.OrderStatusChanged, $"Заказ №{id} {StatusText(to)}", id);
+
         await _db.SaveChangesAsync();
         await tx.CommitAsync();
 
@@ -327,5 +347,15 @@ public class OrdersController : ControllerBase
             .FirstAsync();
 
         return Ok(dto);
+
+
     }
+    private static string StatusText(OrderStatus status) => status switch
+    {
+        OrderStatus.Confirmed => "подтверждён",
+        OrderStatus.InProgress => "взят в работу",
+        OrderStatus.Completed => "выполнен",
+        OrderStatus.Cancelled => "отменён",
+        _ => status.ToString()
+    };
 }

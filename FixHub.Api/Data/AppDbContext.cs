@@ -8,6 +8,7 @@ public class AppDbContext : DbContext
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
     public DbSet<User> Users => Set<User>();
+    public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Service> Services => Set<Service>();
     public DbSet<CartItem> CartItems => Set<CartItem>();
@@ -183,6 +184,20 @@ public class AppDbContext : DbContext
 
             // Оценка от 1 до 5
             e.ToTable(t => t.HasCheckConstraint("CK_Reviews_Rating", "\"Rating\" BETWEEN 1 AND 5"));
+        });
+
+        b.Entity<Notification>(e =>
+        {
+            e.Property(x => x.Text).HasMaxLength(500).IsRequired();
+            e.Property(x => x.Type).HasConversion<string>().HasMaxLength(30);
+
+            // список «мои уведомления» и счётчик непрочитанных ходят именно по этой паре
+            e.HasIndex(x => new { x.UserId, x.IsRead });
+
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
