@@ -42,6 +42,10 @@ public class AdminStatsController : ControllerBase
                 s => byStatus.FirstOrDefault(x => x.Status == s)?.Count ?? 0);
 
         var since = DateTime.UtcNow.AddDays(-30);
+        var weekAgo = DateTime.UtcNow.AddDays(-7);
+
+        var usersCount = await _db.Users.CountAsync();
+        var ordersCount = byStatus.Sum(x => x.Count);
 
         var completedAmount = await _db.Orders
             .Where(o => o.Status == OrderStatus.Completed)
@@ -49,6 +53,18 @@ public class AdminStatsController : ControllerBase
 
         var average = await _db.Reviews
             .Where(r => !r.IsHidden)
+            .AverageAsync(r => (decimal?)r.Rating);
+
+        // что изменилось за неделю
+        var newUsers = await _db.Users.CountAsync(u => u.CreatedAt >= weekAgo);
+        var newOrders = await _db.Orders.CountAsync(o => o.CreatedAt >= weekAgo);
+
+        var weekAmount = await _db.OrderStatusHistory
+            .Where(h => h.ToStatus == OrderStatus.Completed && h.ChangedAt >= weekAgo)
+            .SumAsync(h => (decimal?)h.Order.TotalAmount) ?? 0;
+
+        var averageBefore = await _db.Reviews
+            .Where(r => !r.IsHidden && r.CreatedAt < weekAgo)
             .AverageAsync(r => (decimal?)r.Rating);
 
         var top = await _db.Orders
@@ -67,6 +83,7 @@ public class AdminStatsController : ControllerBase
 
         return Ok(new AdminStatsDto
         {
+            UsersCount = usersCount,
             ClientsCount = RoleCount(UserRole.Client),
             PerformersCount = RoleCount(UserRole.Performer),
             BlockedUsersCount = await _db.Users.CountAsync(u => u.IsBlocked),
@@ -74,7 +91,7 @@ public class AdminStatsController : ControllerBase
             ServicesCount = await _db.Services.CountAsync(),
             ActiveServicesCount = await _db.Services.CountAsync(s => s.IsActive),
 
-            OrdersCount = byStatus.Sum(x => x.Count),
+            OrdersCount = ordersCount,
             OrdersByStatus = ordersByStatus,
             OrdersLast30Days = await _db.Orders.CountAsync(o => o.CreatedAt >= since),
 
@@ -84,7 +101,53 @@ public class AdminStatsController : ControllerBase
             HiddenReviewsCount = await _db.Reviews.CountAsync(r => r.IsHidden),
             AverageRating = ReviewProjection.Round(average),
 
+            UsersGrowthPercent = GrowthPercent(newUsers, usersCount),
+            OrdersGrowthPercent = GrowthPercent(newOrders, ordersCount),
+            AmountGrowthPercent = GrowthPercent(weekAmount, completedAmount),
+            RatingChange = average != null && averageBefore != null
+                ? ReviewProjection.Round(average - averageBefore)
+                : null,
+
             TopPerformers = top
         });
+    }
+
+    // Заказы по дням для графика: за каждый из последних N дней (включая сегодня),
+    // дни без заказов приходят с нулём, чтобы на графике не было дыр
+    [HttpGet("orders-by-day")]
+    public async Task<ActionResult<List<OrdersByDayDto>>> OrdersByDay([FromQuery] int days = 14)
+    {
+        if (days < 1 || days > 90)
+            return BadRequest(new { error = "Период должен быть от 1 до 90 дней" });
+
+        var first = DateTime.UtcNow.Date.AddDays(-(days - 1));
+
+        var grouped = await _db.Orders
+            .Where(o => o.CreatedAt >= first)
+            .GroupBy(o => o.CreatedAt.Date)
+            .Select(g => new { Day = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        var result = Enumerable.Range(0, days)
+            .Select(i =>
+            {
+                var day = first.AddDays(i);
+                return new OrdersByDayDto
+                {
+                    Date = DateOnly.FromDateTime(day),
+                    Count = grouped.FirstOrDefault(x => x.Day.Date == day)?.Count ?? 0
+                };
+            })
+            .ToList();
+
+        return Ok(result);
+    }
+
+    // Прирост за неделю в процентах от значения, которое было до неё
+    private static decimal? GrowthPercent(decimal added, decimal total)
+    {
+        var before = total - added;
+        if (before <= 0) return null;
+        return Math.Round(added / before * 100, 1, MidpointRounding.AwayFromZero);
     }
 }
