@@ -58,4 +58,30 @@ public class AdminStatsTests : IntegrationTestBase
         Assert.Equal(before.CompletedAmount + 50, after.CompletedAmount);
         Assert.True(after.TopPerformers.Count <= 5);
     }
+
+    [Fact]
+    public async Task Orders_by_day_returns_every_day_of_the_period()
+    {
+        var admin = await LoginAdminAsync();
+
+        var response = await Client.CallAsync(HttpMethod.Get, "/api/admin/stats/orders-by-day?days=14", token: admin);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var points = await response.ReadAsync<List<OrdersByDayDto>>();
+        Assert.Equal(14, points.Count);
+        Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow), points[^1].Date);
+        Assert.All(points, p => Assert.True(p.Count >= 0));
+    }
+
+    [Fact]
+    public async Task Orders_by_day_rejects_wrong_period_and_non_admin()
+    {
+        var admin = await LoginAdminAsync();
+        var tooLong = await Client.CallAsync(HttpMethod.Get, "/api/admin/stats/orders-by-day?days=500", token: admin);
+        Assert.Equal(HttpStatusCode.BadRequest, tooLong.StatusCode);
+
+        var (client, _) = await RegisterAsync("Client");
+        var forbidden = await Client.CallAsync(HttpMethod.Get, "/api/admin/stats/orders-by-day", token: client);
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+    }
 }
