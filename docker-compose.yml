@@ -27,6 +27,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       Database__MigrateOnStartup: "true"
       ConnectionStrings__Default: "Host=db;Port=5432;Database=fixhub;Username=fixhub;Password=${POSTGRES_PASSWORD:-fixhub123}"
+      Google__ClientId: ${GOOGLE_CLIENT_ID:-}
       Jwt__Key: ${JWT_KEY:-fixhub-super-secret-key-change-me-0123456789}
       Admin__Password: ${ADMIN_PASSWORD:-Admin12345}
     ports:
