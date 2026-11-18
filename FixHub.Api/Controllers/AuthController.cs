@@ -17,17 +17,23 @@ public class AuthController : ControllerBase
     private readonly IPasswordHasher<User> _hasher;
     private readonly ITokenService _tokens;
     private readonly ILogger<AuthController> _logger;
+    private readonly IConfiguration _config;
+    private readonly IHttpClientFactory _httpFactory;
 
     public AuthController(
         AppDbContext db,
         IPasswordHasher<User> hasher,
         ITokenService tokens,
-        ILogger<AuthController> logger)
+        ILogger<AuthController> logger,
+        IConfiguration config,
+        IHttpClientFactory httpFactory)
     {
         _db = db;
         _hasher = hasher;
         _tokens = tokens;
         _logger = logger;
+        _config = config;
+        _httpFactory = httpFactory;
     }
 
     [HttpPost("register")]
@@ -86,6 +92,97 @@ public class AuthController : ControllerBase
 
         _logger.LogInformation("Вход пользователя {UserId}", user.Id);
         return Ok(BuildResponse(user));
+    }
+
+    // Вход и регистрация через Google: фронт присылает access token,
+    // бэкенд проверяет его у Google и выдаёт обычный JWT FixHub
+    [HttpPost("google")]
+    public async Task<ActionResult<AuthResponse>> Google(GoogleLoginRequest request)
+    {
+        var clientId = _config["Google:ClientId"];
+        if (string.IsNullOrWhiteSpace(clientId))
+            return StatusCode(StatusCodes.Status503ServiceUnavailable,
+                new { error = "Вход через Google не настроен" });
+
+        var profile = await VerifyGoogleToken(request.AccessToken, clientId);
+        if (profile == null)
+            return Unauthorized(new { error = "Не удалось подтвердить аккаунт Google" });
+
+        var email = profile.Email.Trim().ToLowerInvariant();
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
+
+        if (user == null)
+        {
+            var role = request.Role ?? UserRole.Client;
+            if (role != UserRole.Client && role != UserRole.Performer)
+                return BadRequest(new { error = "Регистрация доступна только для ролей Client и Performer" });
+
+            var name = string.IsNullOrWhiteSpace(profile.Name) ? email.Split('@')[0] : profile.Name.Trim();
+
+            user = new User
+            {
+                Email = email,
+                FullName = name.Length > 200 ? name[..200] : name,
+                Role = role
+            };
+            // пароль не используется: ставим случайный, чтобы по нему нельзя было войти
+            user.PasswordHash = _hasher.HashPassword(user, Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"));
+
+            _db.Users.Add(user);
+            await _db.SaveChangesAsync();
+            _logger.LogInformation("Через Google зарегистрирован пользователь {UserId} с ролью {Role}", user.Id, user.Role);
+        }
+        else if (user.IsBlocked)
+        {
+            _logger.LogWarning("Попытка входа заблокированного пользователя {UserId}", user.Id);
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = "Учётная запись заблокирована" });
+        }
+        else
+        {
+            _logger.LogInformation("Вход через Google: пользователь {UserId}", user.Id);
+        }
+
+        return Ok(BuildResponse(user));
+    }
+
+    private sealed record GoogleProfile(string Email, string? Name);
+
+    private async Task<GoogleProfile?> VerifyGoogleToken(string accessToken, string clientId)
+    {
+        try
+        {
+            var http = _httpFactory.CreateClient();
+
+            // 1. токен должен быть выдан именно нашему приложению
+            var info = await http.PostAsync("https://oauth2.googleapis.com/tokeninfo",
+                new FormUrlEncodedContent(new Dictionary<string, string> { ["access_token"] = accessToken }));
+            if (!info.IsSuccessStatusCode) return null;
+
+            using var infoJson = System.Text.Json.JsonDocument.Parse(await info.Content.ReadAsStringAsync());
+            var aud = infoJson.RootElement.TryGetProperty("aud", out var a) ? a.GetString() : null;
+            if (aud != clientId) return null;
+
+            // 2. данные пользователя
+            using var req = new HttpRequestMessage(HttpMethod.Get, "https://www.googleapis.com/oauth2/v3/userinfo");
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            var res = await http.SendAsync(req);
+            if (!res.IsSuccessStatusCode) return null;
+
+            using var json = System.Text.Json.JsonDocument.Parse(await res.Content.ReadAsStringAsync());
+            var root = json.RootElement;
+
+            var email = root.TryGetProperty("email", out var e) ? e.GetString() : null;
+            var verified = root.TryGetProperty("email_verified", out var v) && v.ValueKind == System.Text.Json.JsonValueKind.True;
+            if (string.IsNullOrWhiteSpace(email) || !verified) return null;
+
+            var name = root.TryGetProperty("name", out var n) ? n.GetString() : null;
+            return new GoogleProfile(email, name);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or TaskCanceledException)
+        {
+            _logger.LogWarning(ex, "Не удалось проверить токен Google");
+            return null;
+        }
     }
 
     [Authorize]

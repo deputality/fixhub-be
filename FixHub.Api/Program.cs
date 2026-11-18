@@ -117,6 +117,7 @@ try
     builder.Services.AddAuthorization();
 
     // Свои сервисы
+    builder.Services.AddHttpClient();
     builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
     builder.Services.AddScoped<ITokenService, TokenService>();
     builder.Services.AddScoped<INotificationService, NotificationService>();

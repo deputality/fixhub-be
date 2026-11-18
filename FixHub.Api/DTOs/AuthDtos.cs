@@ -30,6 +30,16 @@ public class LoginRequest
     public string Password { get; set; } = null!;
 }
 
+public class GoogleLoginRequest
+{
+    // access token, полученный на фронте через Google Identity Services
+    [Required]
+    public string AccessToken { get; set; } = null!;
+
+    // роль нужна только при первой регистрации; если не передана, будет Client
+    public UserRole? Role { get; set; }
+}
+
 public class UserDto
 {
     public int Id { get; set; }
