@@ -26,6 +26,10 @@ public class AppDbContext : DbContext
             e.Property(x => x.FullName).HasMaxLength(200).IsRequired();
             e.Property(x => x.Phone).HasMaxLength(30);
             e.Property(x => x.Bio).HasMaxLength(2000);
+            e.Property(x => x.Specialization).HasMaxLength(100);
+            e.Property(x => x.City).HasMaxLength(100);
+            e.Property(x => x.ServiceArea).HasMaxLength(200);
+            e.Property(x => x.AvatarUrl).HasMaxLength(300);
             e.Property(x => x.Role).HasConversion<string>().HasMaxLength(20);
 
             e.HasIndex(x => x.Email).IsUnique();

@@ -11,6 +11,13 @@ public class ProfileDto
     public string? Phone { get; set; }
     public string? Bio { get; set; }
     public string Role { get; set; } = null!;
+
+    public string? Specialization { get; set; }
+    public int? ExperienceYears { get; set; }
+    public string? City { get; set; }
+    public string? ServiceArea { get; set; }
+    public string? AvatarUrl { get; set; }
+    public bool IsVerified { get; set; }
 }
 
 public class UpdateProfileRequest
@@ -23,6 +30,23 @@ public class UpdateProfileRequest
 
     [MaxLength(2000)]
     public string? Bio { get; set; }
+
+    // Поля ниже заполняет только исполнитель; у остальных ролей они игнорируются
+    [MaxLength(100)]
+    public string? Specialization { get; set; }
+
+    [Range(0, 80)]
+    public int? ExperienceYears { get; set; }
+
+    [MaxLength(100)]
+    public string? City { get; set; }
+
+    [MaxLength(200)]
+    public string? ServiceArea { get; set; }
+
+    // Адрес, который вернула загрузка фото (/api/performer/uploads)
+    [MaxLength(300)]
+    public string? AvatarUrl { get; set; }
 }
 
 public class PerformerStatsDto

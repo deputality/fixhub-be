@@ -68,6 +68,17 @@ VALUES
      'Фотограф и специалист по настройке компьютеров', 'Performer', FALSE, NOW() - INTERVAL '35 days')
 ON CONFLICT ("Email") DO NOTHING;
 
+-- Профессиональные данные мастеров (профиль в кабинете исполнителя)
+UPDATE "Users" SET "Specialization" = 'Ремонт бытовой техники', "ExperienceYears" = 10,
+    "City" = 'Минск', "ServiceArea" = 'Весь Минск', "IsVerified" = TRUE
+WHERE "Email" = 'master1@fixhub.test';
+UPDATE "Users" SET "Specialization" = 'Клининг и репетиторство', "ExperienceYears" = 6,
+    "City" = 'Минск', "ServiceArea" = 'Весь Минск', "IsVerified" = TRUE
+WHERE "Email" = 'master2@fixhub.test';
+UPDATE "Users" SET "Specialization" = 'Фотография и компьютерная помощь', "ExperienceYears" = 4,
+    "City" = 'Минск', "ServiceArea" = 'Центр и ближайшие районы'
+WHERE "Email" = 'master3@fixhub.test';
+
 -- ---------------------------------------------------------------------------
 -- Категории (корневые и вложенные)
 -- ---------------------------------------------------------------------------
