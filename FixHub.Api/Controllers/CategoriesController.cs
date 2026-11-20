@@ -21,7 +21,9 @@ public class CategoriesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<List<CategoryDto>>> GetAll()
     {
+        // скрытые категории (и подкатегории скрытой) клиентам не показываем
         var items = await _db.Categories
+            .Where(c => !c.IsHidden && (c.Parent == null || !c.Parent.IsHidden))
             .OrderBy(c => c.Name)
             .Select(c => new CategoryDto { Id = c.Id, Name = c.Name, ParentId = c.ParentId })
             .ToListAsync();
@@ -57,6 +59,18 @@ public class CategoriesController : ControllerBase
         if (request.ParentId != null &&
             !await _db.Categories.AnyAsync(c => c.Id == request.ParentId))
             return BadRequest(new { error = "Родительская категория не найдена" });
+
+        // родителем нельзя сделать собственного потомка, иначе дерево зациклится
+        var ancestorId = request.ParentId;
+        while (ancestorId != null)
+        {
+            if (ancestorId == id)
+                return BadRequest(new { error = "Нельзя вложить категорию в её же подкатегорию" });
+            ancestorId = await _db.Categories
+                .Where(c => c.Id == ancestorId)
+                .Select(c => c.ParentId)
+                .FirstOrDefaultAsync();
+        }
 
         category.Name = request.Name.Trim();
         category.ParentId = request.ParentId;

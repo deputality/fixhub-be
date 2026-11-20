@@ -47,10 +47,13 @@ public class CatalogController : ControllerBase
     };
 
     // В каталог попадают только активные услуги незаблокированных исполнителей
+    // из нескрытых категорий
     private IQueryable<Service> Visible() =>
         _db.Services
             .AsNoTracking()
-            .Where(s => s.IsActive && !s.Performer.IsBlocked);
+            .Where(s => s.IsActive && !s.Performer.IsBlocked
+                && !s.Category.IsHidden
+                && (s.Category.Parent == null || !s.Category.Parent.IsHidden));
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<ServiceDto>>> Search([FromQuery] CatalogQuery query)
