@@ -34,6 +34,9 @@ public class CatalogController : ControllerBase
         CategoryName = s.Category.Name,
         PerformerId = s.PerformerId,
         PerformerName = s.Performer.FullName,
+        PerformerAvatarUrl = s.Performer.AvatarUrl,
+        PerformerSpecialization = s.Performer.Specialization,
+        PerformerIsVerified = s.Performer.IsVerified,
         Rating = _db.Reviews
             .Where(r => r.ServiceId == s.Id && !r.IsHidden)
             .Average(r => (decimal?)r.Rating),
@@ -47,10 +50,13 @@ public class CatalogController : ControllerBase
     };
 
     // В каталог попадают только активные услуги незаблокированных исполнителей
+    // из нескрытых категорий
     private IQueryable<Service> Visible() =>
         _db.Services
             .AsNoTracking()
-            .Where(s => s.IsActive && !s.Performer.IsBlocked);
+            .Where(s => s.IsActive && !s.Performer.IsBlocked
+                && !s.Category.IsHidden
+                && (s.Category.Parent == null || !s.Category.Parent.IsHidden));
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<ServiceDto>>> Search([FromQuery] CatalogQuery query)
@@ -72,6 +78,9 @@ public class CatalogController : ControllerBase
             // выбранная категория и её прямые подкатегории
             q = q.Where(s => s.CategoryId == categoryId || s.Category.ParentId == categoryId);
         }
+
+        if (query.PerformerId != null)
+            q = q.Where(s => s.PerformerId == query.PerformerId);
 
         if (query.MinPrice != null)
             q = q.Where(s => s.Price >= query.MinPrice);

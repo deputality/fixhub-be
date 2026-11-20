@@ -38,6 +38,20 @@ public class ProfileController : ControllerBase
         user.Phone = request.Phone?.Trim();
         user.Bio = request.Bio?.Trim();
 
+        if (user.Role == UserRole.Performer)
+        {
+            // аватар принимаем только с нашего хранилища, а не произвольную ссылку
+            var avatar = request.AvatarUrl?.Trim();
+            if (!string.IsNullOrEmpty(avatar) && !avatar.StartsWith("/uploads/"))
+                return BadRequest(new { error = "Некорректный адрес фото" });
+
+            user.Specialization = request.Specialization?.Trim();
+            user.ExperienceYears = request.ExperienceYears;
+            user.City = request.City?.Trim();
+            user.ServiceArea = request.ServiceArea?.Trim();
+            user.AvatarUrl = string.IsNullOrEmpty(avatar) ? null : avatar;
+        }
+
         await _db.SaveChangesAsync();
         return Ok(ToDto(user));
     }
@@ -49,6 +63,12 @@ public class ProfileController : ControllerBase
         FullName = u.FullName,
         Phone = u.Phone,
         Bio = u.Bio,
-        Role = u.Role.ToString()
+        Role = u.Role.ToString(),
+        Specialization = u.Specialization,
+        ExperienceYears = u.ExperienceYears,
+        City = u.City,
+        ServiceArea = u.ServiceArea,
+        AvatarUrl = u.AvatarUrl,
+        IsVerified = u.IsVerified
     };
 }

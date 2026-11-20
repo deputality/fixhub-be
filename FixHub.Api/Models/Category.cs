@@ -5,6 +5,9 @@ public class Category
     public int Id { get; set; }
     public string Name { get; set; } = null!;
 
+    // Скрытая категория не видна клиентам; услуги и заказы в ней сохраняются
+    public bool IsHidden { get; set; }
+
     public int? ParentId { get; set; }
     public Category? Parent { get; set; }
     public List<Category> Children { get; set; } = new();
