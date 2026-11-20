@@ -130,6 +130,9 @@ public class PerformerServicesController : ControllerBase
         CategoryId = s.CategoryId,
         CategoryName = s.Category.Name,
         PerformerId = s.PerformerId,
-        PerformerName = s.Performer.FullName
+        PerformerName = s.Performer.FullName,
+        PerformerAvatarUrl = s.Performer.AvatarUrl,
+        PerformerSpecialization = s.Performer.Specialization,
+        PerformerIsVerified = s.Performer.IsVerified
     };
 }

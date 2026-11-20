@@ -42,6 +42,9 @@ public class ServiceDto
 
     public int PerformerId { get; set; }
     public string PerformerName { get; set; } = null!;
+    public string? PerformerAvatarUrl { get; set; }
+    public string? PerformerSpecialization { get; set; }
+    public bool PerformerIsVerified { get; set; }
 
     // Рейтинг считается по нескрытым отзывам; null, если отзывов ещё нет
     public decimal? Rating { get; set; }
@@ -67,6 +70,9 @@ public class CatalogQuery
     public string? Search { get; set; }
 
     public int? CategoryId { get; set; }
+
+    // Услуги одного мастера (для страницы мастера)
+    public int? PerformerId { get; set; }
 
     [Range(0, 1000000)]
     public decimal? MinPrice { get; set; }

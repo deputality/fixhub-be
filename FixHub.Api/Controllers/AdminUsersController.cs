@@ -1,6 +1,7 @@
 ﻿using FixHub.Api.Data;
 using FixHub.Api.DTOs;
 using FixHub.Api.Models;
+using FixHub.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,11 +15,13 @@ public class AdminUsersController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly ILogger<AdminUsersController> _logger;
+    private readonly INotificationService _notifications;
 
-    public AdminUsersController(AppDbContext db, ILogger<AdminUsersController> logger)
+    public AdminUsersController(AppDbContext db, ILogger<AdminUsersController> logger, INotificationService notifications)
     {
         _db = db;
         _logger = logger;
+        _notifications = notifications;
     }
 
     [HttpGet]
@@ -39,6 +42,9 @@ public class AdminUsersController : ControllerBase
         if (query.IsBlocked != null)
             q = q.Where(u => u.IsBlocked == query.IsBlocked);
 
+        if (query.IsVerified != null)
+            q = q.Where(u => u.IsVerified == query.IsVerified);
+
         var total = await q.CountAsync();
 
         var items = await q
@@ -53,6 +59,7 @@ public class AdminUsersController : ControllerBase
                 Phone = u.Phone,
                 Role = u.Role.ToString(),
                 IsBlocked = u.IsBlocked,
+                IsVerified = u.IsVerified,
                 CreatedAt = u.CreatedAt
             })
             .ToListAsync();
@@ -90,17 +97,57 @@ public class AdminUsersController : ControllerBase
             blocked ? "заблокировал" : "разблокировал",
             user.Id);
 
-        return Ok(new AdminUserDto
-        {
-            Id = user.Id,
-            Email = user.Email,
-            FullName = user.FullName,
-            Phone = user.Phone,
-            Role = user.Role.ToString(),
-            IsBlocked = user.IsBlocked,
-            CreatedAt = user.CreatedAt
-        });
+        return Ok(ToDto(user));
     }
+
+    // Подтвердить мастера: рядом с его услугами появится отметка «Проверенный специалист»
+    [HttpPost("{id:int}/verify")]
+    public Task<ActionResult<AdminUserDto>> Verify(int id) => SetVerified(id, true);
+
+    // Снять отметку
+    [HttpPost("{id:int}/unverify")]
+    public Task<ActionResult<AdminUserDto>> Unverify(int id) => SetVerified(id, false);
+
+    private async Task<ActionResult<AdminUserDto>> SetVerified(int id, bool verified)
+    {
+        var user = await _db.Users.FindAsync(id);
+        if (user == null)
+            return NotFound(new { error = "Пользователь не найден" });
+
+        // отметка есть только у исполнителей
+        if (user.Role != UserRole.Performer)
+            return BadRequest(new { error = "Проверять можно только исполнителей" });
+
+        if (user.IsVerified != verified)
+        {
+            user.IsVerified = verified;
+
+            if (verified)
+                _notifications.Add(user.Id, NotificationType.ProfileVerified,
+                    "Администратор проверил ваш профиль: теперь у вас отметка «Проверенный мастер»");
+
+            await _db.SaveChangesAsync();
+
+            _logger.LogWarning("Администратор {AdminId} {Action} исполнителя {UserId}",
+                User.FindFirst("sub")?.Value,
+                verified ? "подтвердил" : "снял отметку проверки с",
+                user.Id);
+        }
+
+        return Ok(ToDto(user));
+    }
+
+    private static AdminUserDto ToDto(User user) => new()
+    {
+        Id = user.Id,
+        Email = user.Email,
+        FullName = user.FullName,
+        Phone = user.Phone,
+        Role = user.Role.ToString(),
+        IsBlocked = user.IsBlocked,
+        IsVerified = user.IsVerified,
+        CreatedAt = user.CreatedAt
+    };
 
     private static string EscapeLike(string value) =>
         value.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
