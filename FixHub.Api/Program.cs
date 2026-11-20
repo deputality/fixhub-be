@@ -6,6 +6,7 @@ using FixHub.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
@@ -159,6 +160,15 @@ try
     }
 
     app.UseHttpsRedirection();
+
+    // Загруженные фото услуг отдаются по адресу /uploads/...
+    var uploadsPath = Path.Combine(app.Environment.ContentRootPath, "uploads");
+    Directory.CreateDirectory(uploadsPath);
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(uploadsPath),
+        RequestPath = "/uploads"
+    });
 
     app.UseAuthentication();
     app.UseAuthorization();
