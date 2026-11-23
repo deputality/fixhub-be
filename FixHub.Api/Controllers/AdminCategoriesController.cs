@@ -56,7 +56,7 @@ public class AdminCategoriesController : ControllerBase
         var categories = await _db.Categories
             .AsNoTracking()
             .OrderBy(c => c.Name)
-            .Select(c => new { c.Id, c.Name, c.ParentId, c.IsHidden })
+            .Select(c => new { c.Id, c.Name, c.ParentId, c.IsHidden, c.Icon, c.Color })
             .ToListAsync();
 
         var services = await _db.Services
@@ -90,6 +90,8 @@ public class AdminCategoriesController : ControllerBase
                 Name = c.Name,
                 ParentId = c.ParentId,
                 IsHidden = c.IsHidden,
+                Icon = c.Icon,
+                Color = c.Color,
                 ChildrenCount = children.TryGetValue(c.Id, out var direct) ? direct.Count : 0,
                 ServicesCount = inside.Count,
                 PerformersCount = inside.Select(s => s.PerformerId).Distinct().Count()

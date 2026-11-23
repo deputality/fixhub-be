@@ -17,5 +17,8 @@ public class Notification
     public int? ReviewId { get; set; }
 
     public bool IsRead { get; set; }
+
+    // Когда ушло письмо с этим уведомлением; null, пока не отправлено
+    public DateTime? EmailSentAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

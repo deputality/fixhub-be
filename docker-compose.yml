@@ -30,8 +30,21 @@ services:
       Google__ClientId: ${GOOGLE_CLIENT_ID:-}
       Jwt__Key: ${JWT_KEY:-fixhub-super-secret-key-change-me-0123456789}
       Admin__Password: ${ADMIN_PASSWORD:-Admin12345}
+      # адрес фронтенда для ссылок в письмах (сброс пароля, уведомления)
+      App__BaseUrl: ${APP_BASE_URL:-http://localhost:5173}
+      # почта для писем: пока SMTP_HOST пустой, письма только пишутся в лог контейнера
+      Smtp__Host: ${SMTP_HOST:-}
+      Smtp__Port: ${SMTP_PORT:-587}
+      Smtp__EnableSsl: ${SMTP_SSL:-true}
+      Smtp__User: ${SMTP_USER:-}
+      Smtp__Password: ${SMTP_PASSWORD:-}
+      Smtp__From: ${SMTP_FROM:-}
+    volumes:
+      # загруженные фото услуг, чтобы не терялись при пересборке контейнера
+      - uploads:/app/uploads
     ports:
       - "8080:8080"
 
 volumes:
   pgdata:
+  uploads:

@@ -25,7 +25,7 @@ public class CategoriesController : ControllerBase
         var items = await _db.Categories
             .Where(c => !c.IsHidden && (c.Parent == null || !c.Parent.IsHidden))
             .OrderBy(c => c.Name)
-            .Select(c => new CategoryDto { Id = c.Id, Name = c.Name, ParentId = c.ParentId })
+            .Select(c => new CategoryDto { Id = c.Id, Name = c.Name, ParentId = c.ParentId, Icon = c.Icon, Color = c.Color })
             .ToListAsync();
         return Ok(items);
     }
@@ -38,11 +38,17 @@ public class CategoriesController : ControllerBase
             !await _db.Categories.AnyAsync(c => c.Id == request.ParentId))
             return BadRequest(new { error = "Родительская категория не найдена" });
 
-        var category = new Category { Name = request.Name.Trim(), ParentId = request.ParentId };
+        var category = new Category
+        {
+            Name = request.Name.Trim(),
+            ParentId = request.ParentId,
+            Icon = NormalizeIcon(request.Icon),
+            Color = NormalizeColor(request.Color)
+        };
         _db.Categories.Add(category);
         await _db.SaveChangesAsync();
 
-        return Ok(new CategoryDto { Id = category.Id, Name = category.Name, ParentId = category.ParentId });
+        return Ok(ToDto(category));
     }
 
     [Authorize(Roles = "Admin")]
@@ -74,9 +80,11 @@ public class CategoriesController : ControllerBase
 
         category.Name = request.Name.Trim();
         category.ParentId = request.ParentId;
+        category.Icon = NormalizeIcon(request.Icon);
+        category.Color = NormalizeColor(request.Color);
         await _db.SaveChangesAsync();
 
-        return Ok(new CategoryDto { Id = category.Id, Name = category.Name, ParentId = category.ParentId });
+        return Ok(ToDto(category));
     }
 
     [Authorize(Roles = "Admin")]
@@ -96,4 +104,20 @@ public class CategoriesController : ControllerBase
         await _db.SaveChangesAsync();
         return NoContent();
     }
+
+    private static CategoryDto ToDto(Category c) => new()
+    {
+        Id = c.Id,
+        Name = c.Name,
+        ParentId = c.ParentId,
+        Icon = c.Icon,
+        Color = c.Color
+    };
+
+    private static string? NormalizeIcon(string? icon) =>
+        string.IsNullOrWhiteSpace(icon) ? null : icon.Trim().ToLowerInvariant();
+
+    // цвет храним в нижнем регистре, чтобы #16A34A и #16a34a не считались разными
+    private static string? NormalizeColor(string? color) =>
+        string.IsNullOrWhiteSpace(color) ? null : color.Trim().ToLowerInvariant();
 }

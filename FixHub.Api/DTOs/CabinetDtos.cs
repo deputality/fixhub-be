@@ -18,6 +18,7 @@ public class ProfileDto
     public string? ServiceArea { get; set; }
     public string? AvatarUrl { get; set; }
     public bool IsVerified { get; set; }
+    public bool EmailNotifications { get; set; }
 }
 
 public class UpdateProfileRequest
@@ -108,4 +109,18 @@ public class PerformerPublicDto
     public int ReviewCount { get; set; }
     public int CompletedOrders { get; set; }
     public int ServicesCount { get; set; }
+}
+
+public class NotificationSettingsRequest
+{
+    public bool EmailNotifications { get; set; }
+}
+
+public class ChangePasswordRequest
+{
+    [Required]
+    public string CurrentPassword { get; set; } = null!;
+
+    [Required, MinLength(8), MaxLength(100)]
+    public string NewPassword { get; set; } = null!;
 }

@@ -50,6 +50,9 @@ public class OrderDto
     public int PerformerId { get; set; }
     public string PerformerName { get; set; } = null!;
 
+    // Телефон мастера виден клиенту только после подтверждения заказа
+    public string? PerformerPhone { get; set; }
+
     public List<OrderItemDto> Items { get; set; } = new();
     public List<OrderHistoryDto> History { get; set; } = new();   // заполняется только в GET /api/orders/{id}
 }

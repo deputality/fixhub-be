@@ -67,6 +67,14 @@ namespace FixHub.Api.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Color")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<string>("Icon")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
                     b.Property<bool>("IsHidden")
                         .HasColumnType("boolean");
 
@@ -94,6 +102,9 @@ namespace FixHub.Api.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("EmailSentAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<bool>("IsRead")
@@ -220,6 +231,40 @@ namespace FixHub.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FixHub.Api.Models.OrderMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("SenderId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("SenderId");
+
+                    b.ToTable("OrderMessages");
+                });
+
             modelBuilder.Entity("FixHub.Api.Models.OrderStatusHistory", b =>
                 {
                     b.Property<int>("Id")
@@ -253,6 +298,41 @@ namespace FixHub.Api.Migrations
                     b.HasIndex("OrderId");
 
                     b.ToTable("OrderStatusHistory", (string)null);
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.PasswordResetToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PasswordResetTokens");
                 });
 
             modelBuilder.Entity("FixHub.Api.Models.Review", b =>
@@ -386,6 +466,9 @@ namespace FixHub.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("EmailNotifications")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -512,6 +595,25 @@ namespace FixHub.Api.Migrations
                     b.Navigation("Service");
                 });
 
+            modelBuilder.Entity("FixHub.Api.Models.OrderMessage", b =>
+                {
+                    b.HasOne("FixHub.Api.Models.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("FixHub.Api.Models.User", "Sender")
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Sender");
+                });
+
             modelBuilder.Entity("FixHub.Api.Models.OrderStatusHistory", b =>
                 {
                     b.HasOne("FixHub.Api.Models.User", "ChangedByUser")
@@ -529,6 +631,17 @@ namespace FixHub.Api.Migrations
                     b.Navigation("ChangedByUser");
 
                     b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.PasswordResetToken", b =>
+                {
+                    b.HasOne("FixHub.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("FixHub.Api.Models.Review", b =>

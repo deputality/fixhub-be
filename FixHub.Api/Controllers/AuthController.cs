@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace FixHub.Api.Controllers;
 
@@ -19,6 +21,7 @@ public class AuthController : ControllerBase
     private readonly ILogger<AuthController> _logger;
     private readonly IConfiguration _config;
     private readonly IHttpClientFactory _httpFactory;
+    private readonly IEmailSender _email;
 
     public AuthController(
         AppDbContext db,
@@ -26,7 +29,8 @@ public class AuthController : ControllerBase
         ITokenService tokens,
         ILogger<AuthController> logger,
         IConfiguration config,
-        IHttpClientFactory httpFactory)
+        IHttpClientFactory httpFactory,
+        IEmailSender email)
     {
         _db = db;
         _hasher = hasher;
@@ -34,6 +38,7 @@ public class AuthController : ControllerBase
         _logger = logger;
         _config = config;
         _httpFactory = httpFactory;
+        _email = email;
     }
 
     [HttpPost("register")]
@@ -184,6 +189,85 @@ public class AuthController : ControllerBase
             return null;
         }
     }
+
+    // Шаг 1 восстановления пароля: отправляем ссылку на почту.
+    // Ответ всегда одинаковый, чтобы по нему нельзя было узнать, зарегистрирован ли email.
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordRequest request)
+    {
+        const string answer = "Если такой email зарегистрирован, мы отправили на него ссылку для сброса пароля";
+
+        var email = request.Email.Trim().ToLowerInvariant();
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
+        if (user == null || user.IsBlocked)
+            return Ok(new { message = answer });
+
+        var now = DateTime.UtcNow;
+
+        // не чаще одного письма в минуту, чтобы форму нельзя было использовать для рассылки спама
+        var tooSoon = await _db.PasswordResetTokens
+            .AnyAsync(t => t.UserId == user.Id && t.CreatedAt > now.AddMinutes(-1));
+        if (tooSoon)
+            return Ok(new { message = answer });
+
+        // прежние неиспользованные ссылки перестают работать
+        var old = await _db.PasswordResetTokens
+            .Where(t => t.UserId == user.Id && t.UsedAt == null)
+            .ToListAsync();
+        foreach (var t in old) t.UsedAt = now;
+
+        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant();
+        _db.PasswordResetTokens.Add(new PasswordResetToken
+        {
+            UserId = user.Id,
+            TokenHash = HashToken(token),
+            ExpiresAt = now.AddHours(1),
+            CreatedAt = now
+        });
+        await _db.SaveChangesAsync();
+
+        var baseUrl = (_config["App:BaseUrl"] ?? "http://localhost:5173").TrimEnd('/');
+        var link = $"{baseUrl}/reset-password?token={token}";
+
+        try
+        {
+            await _email.SendAsync(user.Email, "FixHub: сброс пароля",
+                $"Здравствуйте, {user.FullName.Split(' ')[0]}!\n\n" +
+                "Вы запросили сброс пароля. Перейдите по ссылке, чтобы задать новый (она действует 1 час):\n" +
+                $"{link}\n\n" +
+                "Если это были не вы, просто проигнорируйте письмо: пароль останется прежним.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Не удалось отправить письмо для сброса пароля пользователю {UserId}", user.Id);
+        }
+
+        _logger.LogInformation("Запрошен сброс пароля пользователя {UserId}", user.Id);
+        return Ok(new { message = answer });
+    }
+
+    // Шаг 2: по ссылке из письма задаём новый пароль
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(ResetPasswordRequest request)
+    {
+        var hash = HashToken(request.Token.Trim());
+        var token = await _db.PasswordResetTokens
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.TokenHash == hash);
+
+        if (token == null || token.UsedAt != null || token.ExpiresAt < DateTime.UtcNow || token.User.IsBlocked)
+            return BadRequest(new { error = "Ссылка недействительна или устарела. Запросите новую." });
+
+        token.User.PasswordHash = _hasher.HashPassword(token.User, request.NewPassword);
+        token.UsedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Пароль пользователя {UserId} сброшен по ссылке из письма", token.UserId);
+        return Ok(new { message = "Пароль изменён. Теперь можно войти." });
+    }
+
+    private static string HashToken(string token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
 
     [Authorize]
     [HttpGet("me")]

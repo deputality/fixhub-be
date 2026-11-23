@@ -67,6 +67,13 @@ docker compose down -v     # остановить и удалить данные
 | `ADMIN_PASSWORD` | `Admin12345` | пароль администратора, создаваемого при первом запуске |
 
 Значения по умолчанию подходят только для разработки. Для реального развёртывания задай свои через файл `.env` рядом с `docker-compose.yml`.
+Кроме того, в `docker-compose.yml` стоит `ASPNETCORE_ENVIRONMENT=Development` (нужно для Swagger): на реальном сервере замени его на `Production`.
+
+Фото услуг хранятся в volume `uploads` (`/app/uploads`) и переживают пересборку контейнера. `docker compose down -v` удалит и их.
+
+**CORS.** Фронтенду из другого источника разрешён адрес из `App:BaseUrl`. Чтобы разрешить другие, задай `Cors:AllowedOrigins`
+(в `appsettings.json` или переменными `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`).
+В разработке запросы идут через прокси Vite, и CORS не задействован.
 
 ## Запуск для разработки (без контейнера API)
 

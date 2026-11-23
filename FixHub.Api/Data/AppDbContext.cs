@@ -1,4 +1,4 @@
-using FixHub.Api.Models;
+﻿using FixHub.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace FixHub.Api.Data;
@@ -9,12 +9,14 @@ public class AppDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Service> Services => Set<Service>();
     public DbSet<CartItem> CartItems => Set<CartItem>();
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<OrderStatusHistory> OrderStatusHistory => Set<OrderStatusHistory>();
+    public DbSet<OrderMessage> OrderMessages => Set<OrderMessage>();
     public DbSet<Review> Reviews => Set<Review>();
 
     protected override void OnModelCreating(ModelBuilder b)
@@ -38,6 +40,8 @@ public class AppDbContext : DbContext
         b.Entity<Category>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Icon).HasMaxLength(40);
+            e.Property(x => x.Color).HasMaxLength(7);
 
             e.HasOne(x => x.Parent)
                 .WithMany(x => x.Children)
@@ -154,6 +158,21 @@ public class AppDbContext : DbContext
             e.HasIndex(x => x.OrderId);
         });
 
+        b.Entity<OrderMessage>(e =>
+        {
+            e.Property(x => x.Text).HasMaxLength(1000).IsRequired();
+
+            e.HasOne(x => x.Order)
+                .WithMany()
+                .HasForeignKey(x => x.OrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Sender)
+                .WithMany()
+                .HasForeignKey(x => x.SenderId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         b.Entity<Review>(e =>
         {
             e.Property(x => x.Text).HasMaxLength(2000).IsRequired();
@@ -188,6 +207,18 @@ public class AppDbContext : DbContext
 
             // Оценка от 1 до 5
             e.ToTable(t => t.HasCheckConstraint("CK_Reviews_Rating", "\"Rating\" BETWEEN 1 AND 5"));
+        });
+
+        b.Entity<PasswordResetToken>(e =>
+        {
+            e.Property(x => x.TokenHash).HasMaxLength(64).IsRequired();
+
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => x.TokenHash).IsUnique();
         });
 
         b.Entity<Notification>(e =>
