@@ -9,6 +9,7 @@ public class AppDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<PasswordResetToken> PasswordResetTokens => Set<PasswordResetToken>();
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Service> Services => Set<Service>();
     public DbSet<CartItem> CartItems => Set<CartItem>();
@@ -190,6 +191,18 @@ public class AppDbContext : DbContext
 
             // Оценка от 1 до 5
             e.ToTable(t => t.HasCheckConstraint("CK_Reviews_Rating", "\"Rating\" BETWEEN 1 AND 5"));
+        });
+
+        b.Entity<PasswordResetToken>(e =>
+        {
+            e.Property(x => x.TokenHash).HasMaxLength(64).IsRequired();
+
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => x.TokenHash).IsUnique();
         });
 
         b.Entity<Notification>(e =>

@@ -122,6 +122,8 @@ try
     builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
     builder.Services.AddScoped<ITokenService, TokenService>();
     builder.Services.AddScoped<INotificationService, NotificationService>();
+    builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+    builder.Services.AddHostedService<EmailNotificationWorker>();
 
     var app = builder.Build();
 

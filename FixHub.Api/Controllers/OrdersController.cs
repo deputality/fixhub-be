@@ -39,6 +39,11 @@ public class OrdersController : ControllerBase
         ClientName = o.Client.FullName,
         PerformerId = o.PerformerId,
         PerformerName = o.Performer.FullName,
+        PerformerPhone = o.Status == OrderStatus.Confirmed
+            || o.Status == OrderStatus.InProgress
+            || o.Status == OrderStatus.Completed
+                ? o.Performer.Phone
+                : null,
         Items = o.Items
             .OrderBy(i => i.Id)
             .Select(i => new OrderItemDto

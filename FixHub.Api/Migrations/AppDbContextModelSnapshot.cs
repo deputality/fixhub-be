@@ -104,6 +104,9 @@ namespace FixHub.Api.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTime?>("EmailSentAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsRead")
                         .HasColumnType("boolean");
 
@@ -263,6 +266,41 @@ namespace FixHub.Api.Migrations
                     b.ToTable("OrderStatusHistory", (string)null);
                 });
 
+            modelBuilder.Entity("FixHub.Api.Models.PasswordResetToken", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PasswordResetTokens");
+                });
+
             modelBuilder.Entity("FixHub.Api.Models.Review", b =>
                 {
                     b.Property<int>("Id")
@@ -393,6 +431,9 @@ namespace FixHub.Api.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("EmailNotifications")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -537,6 +578,17 @@ namespace FixHub.Api.Migrations
                     b.Navigation("ChangedByUser");
 
                     b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.PasswordResetToken", b =>
+                {
+                    b.HasOne("FixHub.Api.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("FixHub.Api.Models.Review", b =>

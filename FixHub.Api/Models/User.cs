@@ -20,5 +20,8 @@ public class User
     public bool IsVerified { get; set; }
     public UserRole Role { get; set; }
     public bool IsBlocked { get; set; }
+
+    // Присылать ли уведомления о заказах на почту
+    public bool EmailNotifications { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

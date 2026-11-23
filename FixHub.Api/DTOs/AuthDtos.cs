@@ -40,6 +40,21 @@ public class GoogleLoginRequest
     public UserRole? Role { get; set; }
 }
 
+public class ForgotPasswordRequest
+{
+    [Required, EmailAddress, MaxLength(256)]
+    public string Email { get; set; } = null!;
+}
+
+public class ResetPasswordRequest
+{
+    [Required, MaxLength(200)]
+    public string Token { get; set; } = null!;
+
+    [Required, MinLength(8), MaxLength(100)]
+    public string NewPassword { get; set; } = null!;
+}
+
 public class UserDto
 {
     public int Id { get; set; }
