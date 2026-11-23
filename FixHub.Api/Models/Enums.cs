@@ -27,5 +27,6 @@ public enum NotificationType
     NewOrder = 1,
     OrderStatusChanged = 2,
     NewReview = 3,
-    ProfileVerified = 4
+    ProfileVerified = 4,
+    NewMessage = 5
 }

@@ -231,6 +231,40 @@ namespace FixHub.Api.Migrations
                         });
                 });
 
+            modelBuilder.Entity("FixHub.Api.Models.OrderMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("OrderId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ReadAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("SenderId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderId");
+
+                    b.HasIndex("SenderId");
+
+                    b.ToTable("OrderMessages");
+                });
+
             modelBuilder.Entity("FixHub.Api.Models.OrderStatusHistory", b =>
                 {
                     b.Property<int>("Id")
@@ -559,6 +593,25 @@ namespace FixHub.Api.Migrations
                     b.Navigation("Order");
 
                     b.Navigation("Service");
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.OrderMessage", b =>
+                {
+                    b.HasOne("FixHub.Api.Models.Order", "Order")
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("FixHub.Api.Models.User", "Sender")
+                        .WithMany()
+                        .HasForeignKey("SenderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Order");
+
+                    b.Navigation("Sender");
                 });
 
             modelBuilder.Entity("FixHub.Api.Models.OrderStatusHistory", b =>
