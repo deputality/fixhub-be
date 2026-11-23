@@ -30,8 +30,12 @@ services:
       Google__ClientId: ${GOOGLE_CLIENT_ID:-}
       Jwt__Key: ${JWT_KEY:-fixhub-super-secret-key-change-me-0123456789}
       Admin__Password: ${ADMIN_PASSWORD:-Admin12345}
+    volumes:
+      # загруженные фото услуг, чтобы не терялись при пересборке контейнера
+      - uploads:/app/uploads
     ports:
       - "8080:8080"
 
 volumes:
   pgdata:
+  uploads:

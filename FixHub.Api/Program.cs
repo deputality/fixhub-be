@@ -117,6 +117,15 @@ try
 
     builder.Services.AddAuthorization();
 
+    // CORS: нужен, когда фронтенд открыт с другого адреса, чем API (в разработке запросы идут через прокси Vite).
+    // Разрешённые адреса задаются в Cors:AllowedOrigins, по умолчанию разрешён только App:BaseUrl
+    var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+    if (corsOrigins is not { Length: > 0 })
+        corsOrigins = new[] { (builder.Configuration["App:BaseUrl"] ?? "http://localhost:5173").TrimEnd('/') };
+
+    builder.Services.AddCors(options => options.AddDefaultPolicy(policy =>
+        policy.WithOrigins(corsOrigins).AllowAnyHeader().AllowAnyMethod()));
+
     // Свои сервисы
     builder.Services.AddHttpClient();
     builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
@@ -171,6 +180,8 @@ try
         FileProvider = new PhysicalFileProvider(uploadsPath),
         RequestPath = "/uploads"
     });
+
+    app.UseCors();
 
     app.UseAuthentication();
     app.UseAuthorization();
