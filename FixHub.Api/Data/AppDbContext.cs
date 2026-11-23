@@ -1,4 +1,4 @@
-using FixHub.Api.Models;
+﻿using FixHub.Api.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace FixHub.Api.Data;
@@ -38,6 +38,8 @@ public class AppDbContext : DbContext
         b.Entity<Category>(e =>
         {
             e.Property(x => x.Name).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Icon).HasMaxLength(40);
+            e.Property(x => x.Color).HasMaxLength(7);
 
             e.HasOne(x => x.Parent)
                 .WithMany(x => x.Children)
