@@ -1,6 +1,7 @@
 ﻿using FixHub.Api.Data;
 using FixHub.Api.DTOs;
 using FixHub.Api.Models;
+using FixHub.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,11 +13,15 @@ namespace FixHub.Api.Controllers;
 public class CategoriesController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly IAuditService _audit;
 
-    public CategoriesController(AppDbContext db)
+    public CategoriesController(AppDbContext db, IAuditService audit)
     {
         _db = db;
+        _audit = audit;
     }
+
+    private int AdminId => int.Parse(User.FindFirst("sub")!.Value);
 
     [HttpGet]
     public async Task<ActionResult<List<CategoryDto>>> GetAll()
@@ -46,6 +51,10 @@ public class CategoriesController : ControllerBase
             Color = NormalizeColor(request.Color)
         };
         _db.Categories.Add(category);
+        await _db.SaveChangesAsync();
+
+        // id нужен для записи журнала, поэтому сначала сохраняем категорию
+        _audit.Add(AdminId, "category.create", "Category", category.Id, category.Name);
         await _db.SaveChangesAsync();
 
         return Ok(ToDto(category));
@@ -82,6 +91,7 @@ public class CategoriesController : ControllerBase
         category.ParentId = request.ParentId;
         category.Icon = NormalizeIcon(request.Icon);
         category.Color = NormalizeColor(request.Color);
+        _audit.Add(AdminId, "category.update", "Category", category.Id, category.Name);
         await _db.SaveChangesAsync();
 
         return Ok(ToDto(category));
@@ -101,6 +111,7 @@ public class CategoriesController : ControllerBase
             return Conflict(new { error = "Нельзя удалить категорию: в ней есть подкатегории или услуги" });
 
         _db.Categories.Remove(category);
+        _audit.Add(AdminId, "category.delete", "Category", id, category.Name);
         await _db.SaveChangesAsync();
         return NoContent();
     }

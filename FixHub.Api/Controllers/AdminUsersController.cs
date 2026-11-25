@@ -16,12 +16,17 @@ public class AdminUsersController : ControllerBase
     private readonly AppDbContext _db;
     private readonly ILogger<AdminUsersController> _logger;
     private readonly INotificationService _notifications;
+    private readonly IAuditService _audit;
 
-    public AdminUsersController(AppDbContext db, ILogger<AdminUsersController> logger, INotificationService notifications)
+    private int AdminId => int.Parse(User.FindFirst("sub")!.Value);
+
+    public AdminUsersController(AppDbContext db, ILogger<AdminUsersController> logger,
+        INotificationService notifications, IAuditService audit)
     {
         _db = db;
         _logger = logger;
         _notifications = notifications;
+        _audit = audit;
     }
 
     [HttpGet]
@@ -60,6 +65,7 @@ public class AdminUsersController : ControllerBase
                 Role = u.Role.ToString(),
                 IsBlocked = u.IsBlocked,
                 IsVerified = u.IsVerified,
+                DocumentsCount = _db.VerificationDocuments.Count(d => d.UserId == u.Id),
                 CreatedAt = u.CreatedAt
             })
             .ToListAsync();
@@ -90,6 +96,7 @@ public class AdminUsersController : ControllerBase
             return BadRequest(new { error = "Администратора заблокировать нельзя" });
 
         user.IsBlocked = blocked;
+        _audit.Add(AdminId, blocked ? "user.block" : "user.unblock", "User", user.Id, user.FullName);
         await _db.SaveChangesAsync();
 
         _logger.LogWarning("Администратор {AdminId} {Action} пользователя {UserId}",
@@ -126,6 +133,7 @@ public class AdminUsersController : ControllerBase
                 _notifications.Add(user.Id, NotificationType.ProfileVerified,
                     "Администратор проверил ваш профиль: теперь у вас отметка «Проверенный мастер»");
 
+            _audit.Add(AdminId, verified ? "user.verify" : "user.unverify", "User", user.Id, user.FullName);
             await _db.SaveChangesAsync();
 
             _logger.LogWarning("Администратор {AdminId} {Action} исполнителя {UserId}",
@@ -137,7 +145,7 @@ public class AdminUsersController : ControllerBase
         return Ok(ToDto(user));
     }
 
-    private static AdminUserDto ToDto(User user) => new()
+    private AdminUserDto ToDto(User user) => new()
     {
         Id = user.Id,
         Email = user.Email,
@@ -146,6 +154,7 @@ public class AdminUsersController : ControllerBase
         Role = user.Role.ToString(),
         IsBlocked = user.IsBlocked,
         IsVerified = user.IsVerified,
+        DocumentsCount = _db.VerificationDocuments.Count(d => d.UserId == user.Id),
         CreatedAt = user.CreatedAt
     };
 

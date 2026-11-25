@@ -14,6 +14,30 @@ public class CheckoutRequest
     public string ContactPhone { get; set; } = null!;
 }
 
+// «Заказать» без корзины: одна услуга и контакты в одном запросе
+public class QuickOrderRequest
+{
+    [Required]
+    public int ServiceId { get; set; }
+
+    [Range(1, 100)]
+    public int Quantity { get; set; } = 1;
+
+    public DateOnly? DesiredDate { get; set; }
+
+    [MaxLength(1000)]
+    public string? Comment { get; set; }
+
+    [Required, MaxLength(500)]
+    public string Address { get; set; } = null!;
+
+    [Required, MaxLength(200)]
+    public string ContactName { get; set; } = null!;
+
+    [Required, MaxLength(30)]
+    public string ContactPhone { get; set; } = null!;
+}
+
 public class OrderItemDto
 {
     public int Id { get; set; }

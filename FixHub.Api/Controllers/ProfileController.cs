@@ -1,6 +1,7 @@
 ﻿using FixHub.Api.Data;
 using FixHub.Api.DTOs;
 using FixHub.Api.Models;
+using FixHub.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -48,10 +49,15 @@ public class ProfileController : ControllerBase
             if (!string.IsNullOrEmpty(avatar) && !avatar.StartsWith("/uploads/"))
                 return BadRequest(new { error = "Некорректный адрес фото" });
 
+            if ((request.Latitude == null) != (request.Longitude == null))
+                return BadRequest(new { error = "Укажите и широту, и долготу" });
+
             user.Specialization = request.Specialization?.Trim();
             user.ExperienceYears = request.ExperienceYears;
             user.City = request.City?.Trim();
             user.ServiceArea = request.ServiceArea?.Trim();
+            user.Latitude = GeoMath.RoundCoordinate(request.Latitude);
+            user.Longitude = GeoMath.RoundCoordinate(request.Longitude);
             user.AvatarUrl = string.IsNullOrEmpty(avatar) ? null : avatar;
         }
 
@@ -98,6 +104,8 @@ public class ProfileController : ControllerBase
         ExperienceYears = u.ExperienceYears,
         City = u.City,
         ServiceArea = u.ServiceArea,
+        Latitude = u.Latitude,
+        Longitude = u.Longitude,
         AvatarUrl = u.AvatarUrl,
         IsVerified = u.IsVerified,
         EmailNotifications = u.EmailNotifications

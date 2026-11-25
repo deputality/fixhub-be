@@ -79,6 +79,11 @@ UPDATE "Users" SET "Specialization" = 'Фотография и компьюте�
     "City" = 'Минск', "ServiceArea" = 'Центр и ближайшие районы'
 WHERE "Email" = 'master3@fixhub.test';
 
+-- Точки на карте (округлены до ~1 км): для поиска «рядом со мной» и карты
+UPDATE "Users" SET "Latitude" = 53.90, "Longitude" = 27.56 WHERE "Email" = 'master1@fixhub.test';
+UPDATE "Users" SET "Latitude" = 53.93, "Longitude" = 27.65 WHERE "Email" = 'master2@fixhub.test';
+UPDATE "Users" SET "Latitude" = 53.86, "Longitude" = 27.47 WHERE "Email" = 'master3@fixhub.test';
+
 -- ---------------------------------------------------------------------------
 -- Категории (корневые и вложенные)
 -- ---------------------------------------------------------------------------

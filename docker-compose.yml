@@ -42,9 +42,12 @@ services:
     volumes:
       # загруженные фото услуг, чтобы не терялись при пересборке контейнера
       - uploads:/app/uploads
+      # документы мастеров для проверки: закрытая папка, наружу не отдаётся
+      - private_uploads:/app/private-uploads
     ports:
       - "8080:8080"
 
 volumes:
   pgdata:
   uploads:
+  private_uploads:

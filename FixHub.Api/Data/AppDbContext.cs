@@ -18,6 +18,12 @@ public class AppDbContext : DbContext
     public DbSet<OrderStatusHistory> OrderStatusHistory => Set<OrderStatusHistory>();
     public DbSet<OrderMessage> OrderMessages => Set<OrderMessage>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<PortfolioItem> PortfolioItems => Set<PortfolioItem>();
+    public DbSet<FavoriteService> FavoriteServices => Set<FavoriteService>();
+    public DbSet<FavoritePerformer> FavoritePerformers => Set<FavoritePerformer>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Complaint> Complaints => Set<Complaint>();
+    public DbSet<VerificationDocument> VerificationDocuments => Set<VerificationDocument>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -209,6 +215,54 @@ public class AppDbContext : DbContext
             e.ToTable(t => t.HasCheckConstraint("CK_Reviews_Rating", "\"Rating\" BETWEEN 1 AND 5"));
         });
 
+        b.Entity<PortfolioItem>(e =>
+        {
+            e.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Description).HasMaxLength(1000);
+            e.Property(x => x.BeforeUrl).HasMaxLength(300);
+            e.Property(x => x.AfterUrl).HasMaxLength(300).IsRequired();
+
+            e.HasOne(x => x.Performer)
+                .WithMany()
+                .HasForeignKey(x => x.PerformerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => new { x.PerformerId, x.CreatedAt });
+        });
+
+        b.Entity<FavoriteService>(e =>
+        {
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Service)
+                .WithMany()
+                .HasForeignKey(x => x.ServiceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Одну услугу нельзя добавить в избранное дважды
+            e.HasIndex(x => new { x.UserId, x.ServiceId }).IsUnique();
+            e.HasIndex(x => x.ServiceId);
+        });
+
+        b.Entity<FavoritePerformer>(e =>
+        {
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Performer)
+                .WithMany()
+                .HasForeignKey(x => x.PerformerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => new { x.UserId, x.PerformerId }).IsUnique();
+            e.HasIndex(x => x.PerformerId);
+        });
+
         b.Entity<PasswordResetToken>(e =>
         {
             e.Property(x => x.TokenHash).HasMaxLength(64).IsRequired();
@@ -219,6 +273,52 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
 
             e.HasIndex(x => x.TokenHash).IsUnique();
+        });
+
+        b.Entity<AuditLog>(e =>
+        {
+            e.Property(x => x.Action).HasMaxLength(40).IsRequired();
+            e.Property(x => x.TargetType).HasMaxLength(20).IsRequired();
+            e.Property(x => x.TargetName).HasMaxLength(200);
+            e.Property(x => x.Details).HasMaxLength(500);
+
+            e.HasIndex(x => x.CreatedAt);
+
+            e.HasOne(x => x.Admin)
+                .WithMany()
+                .HasForeignKey(x => x.AdminId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<Complaint>(e =>
+        {
+            e.Property(x => x.Kind).HasMaxLength(20).IsRequired();
+            e.Property(x => x.Reason).HasMaxLength(30).IsRequired();
+            e.Property(x => x.Comment).HasMaxLength(1000);
+            e.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            e.Property(x => x.Resolution).HasMaxLength(500);
+
+            e.HasIndex(x => new { x.Status, x.CreatedAt });
+
+            e.HasOne(x => x.Reporter)
+                .WithMany()
+                .HasForeignKey(x => x.ReporterId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        b.Entity<VerificationDocument>(e =>
+        {
+            e.Property(x => x.Kind).HasMaxLength(20).IsRequired();
+            e.Property(x => x.OriginalName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.StoredName).HasMaxLength(80).IsRequired();
+            e.Property(x => x.ContentType).HasMaxLength(100).IsRequired();
+
+            e.HasIndex(x => x.UserId);
+
+            e.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         b.Entity<Notification>(e =>

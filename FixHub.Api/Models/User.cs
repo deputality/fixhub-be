@@ -14,6 +14,10 @@ public class User
     public int? ExperienceYears { get; set; }
     public string? City { get; set; }
     public string? ServiceArea { get; set; }
+
+    // Точка на карте, от которой мастер выезжает (округляется до ~1 км, точный адрес не хранится)
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
     public string? AvatarUrl { get; set; }
 
     // Отметка «Проверенный мастер»: ставится после проверки документов

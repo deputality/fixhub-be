@@ -95,37 +95,9 @@ public class OrdersController : ControllerBase
 
         foreach (var group in cart.GroupBy(c => c.Service.PerformerId))
         {
-            var order = new Order
-            {
-                ClientId = userId,
-                PerformerId = group.Key,
-                Status = OrderStatus.New,
-                Address = request.Address.Trim(),
-                ContactName = request.ContactName.Trim(),
-                ContactPhone = request.ContactPhone.Trim(),
-                CreatedAt = now,
-                Items = group.Select(c => new OrderItem
-                {
-                    ServiceId = c.ServiceId,
-                    ServiceTitle = c.Service.Title,   // название и цена фиксируются на момент оформления
-                    UnitPrice = c.Service.Price,
-                    Quantity = c.Quantity,
-                    DesiredDate = c.DesiredDate,
-                    Comment = c.Comment
-                }).ToList()
-            };
-
-            order.TotalAmount = order.Items.Sum(i => i.UnitPrice * i.Quantity);
-
-            order.History.Add(new OrderStatusHistory
-            {
-                FromStatus = null,
-                ToStatus = OrderStatus.New,
-                ChangedByUserId = userId,
-                ChangedAt = now
-            });
-
-            orders.Add(order);
+            // название и цена фиксируются на момент оформления
+            var items = group.Select(c => NewItem(c.Service, c.Quantity, c.DesiredDate, c.Comment)).ToList();
+            orders.Add(NewOrder(userId, group.Key, request.Address, request.ContactName, request.ContactPhone, items, now));
         }
 
         _db.Orders.AddRange(orders);
@@ -160,6 +132,100 @@ public class OrdersController : ControllerBase
             .ToListAsync();
 
         return Ok(result);
+    }
+
+    // Заказ одной услуги без корзины: кнопка «Заказать» на странице услуги.
+    // Корзина клиента при этом не трогается.
+    [Authorize(Roles = "Client")]
+    [HttpPost("quick")]
+    public async Task<ActionResult<OrderDto>> QuickOrder(QuickOrderRequest request)
+    {
+        var userId = CurrentUserId;
+
+        // запас в один день из-за разницы часовых поясов
+        var earliest = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
+        if (request.DesiredDate != null && request.DesiredDate < earliest)
+            return BadRequest(new { error = "Желаемая дата не может быть в прошлом" });
+
+        var service = await _db.Services
+            .Include(s => s.Performer)
+            .Include(s => s.Category).ThenInclude(c => c.Parent)
+            .FirstOrDefaultAsync(s => s.Id == request.ServiceId);
+
+        if (service == null)
+            return NotFound(new { error = "Услуга не найдена" });
+
+        if (!service.IsActive || service.Performer.IsBlocked
+            || service.Category.IsHidden || service.Category.Parent?.IsHidden == true)
+            return BadRequest(new { error = "Эта услуга недоступна для заказа" });
+
+        var now = DateTime.UtcNow;
+        var order = NewOrder(
+            userId, service.PerformerId, request.Address, request.ContactName, request.ContactPhone,
+            new List<OrderItem> { NewItem(service, request.Quantity, request.DesiredDate, request.Comment) },
+            now);
+
+        _db.Orders.Add(order);
+        await _db.SaveChangesAsync();
+
+        _notifications.Add(
+            order.PerformerId,
+            NotificationType.NewOrder,
+            $"Новый заказ №{order.Id} на сумму {order.TotalAmount:0.##}",
+            order.Id);
+
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Клиент {ClientId} заказал услугу {ServiceId} напрямую, заказ {OrderId} на сумму {Total}",
+            userId, service.Id, order.Id, order.TotalAmount);
+
+        var result = await _db.Orders
+            .AsNoTracking()
+            .Where(o => o.Id == order.Id)
+            .Select(ToDto)
+            .FirstAsync();
+
+        return Ok(result);
+    }
+
+    private static OrderItem NewItem(Service service, int quantity, DateOnly? desiredDate, string? comment) => new()
+    {
+        ServiceId = service.Id,
+        ServiceTitle = service.Title,
+        UnitPrice = service.Price,
+        Quantity = quantity,
+        DesiredDate = desiredDate,
+        Comment = comment?.Trim()
+    };
+
+    private static Order NewOrder(
+        int clientId, int performerId, string address, string contactName, string contactPhone,
+        List<OrderItem> items, DateTime now)
+    {
+        var order = new Order
+        {
+            ClientId = clientId,
+            PerformerId = performerId,
+            Status = OrderStatus.New,
+            Address = address.Trim(),
+            ContactName = contactName.Trim(),
+            ContactPhone = contactPhone.Trim(),
+            CreatedAt = now,
+            Items = items
+        };
+
+        order.TotalAmount = order.Items.Sum(i => i.UnitPrice * i.Quantity);
+
+        order.History.Add(new OrderStatusHistory
+        {
+            FromStatus = null,
+            ToStatus = OrderStatus.New,
+            ChangedByUserId = clientId,
+            ChangedAt = now
+        });
+
+        return order;
     }
 
     // ---------- Просмотр ----------

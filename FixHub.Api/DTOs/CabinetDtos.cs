@@ -16,6 +16,8 @@ public class ProfileDto
     public int? ExperienceYears { get; set; }
     public string? City { get; set; }
     public string? ServiceArea { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
     public string? AvatarUrl { get; set; }
     public bool IsVerified { get; set; }
     public bool EmailNotifications { get; set; }
@@ -45,6 +47,13 @@ public class UpdateProfileRequest
     [MaxLength(200)]
     public string? ServiceArea { get; set; }
 
+    // Точка на карте: задаются только вместе, сервер округляет их до ~1 км
+    [Range(-90, 90)]
+    public double? Latitude { get; set; }
+
+    [Range(-180, 180)]
+    public double? Longitude { get; set; }
+
     // Адрес, который вернула загрузка фото (/api/performer/uploads)
     [MaxLength(300)]
     public string? AvatarUrl { get; set; }
@@ -70,6 +79,9 @@ public class AdminUserDto
 
     // Отметка «Проверенный мастер»; для клиентов и админа всегда false
     public bool IsVerified { get; set; }
+
+    // Сколько документов для проверки загрузил мастер
+    public int DocumentsCount { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 
@@ -100,6 +112,8 @@ public class PerformerPublicDto
     public int? ExperienceYears { get; set; }
     public string? City { get; set; }
     public string? ServiceArea { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
     public string? Bio { get; set; }
     public string? AvatarUrl { get; set; }
     public bool IsVerified { get; set; }

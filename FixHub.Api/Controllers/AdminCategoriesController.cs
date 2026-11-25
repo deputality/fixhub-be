@@ -1,5 +1,6 @@
 ﻿using FixHub.Api.Data;
 using FixHub.Api.DTOs;
+using FixHub.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -13,11 +14,13 @@ public class AdminCategoriesController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly ILogger<AdminCategoriesController> _logger;
+    private readonly IAuditService _audit;
 
-    public AdminCategoriesController(AppDbContext db, ILogger<AdminCategoriesController> logger)
+    public AdminCategoriesController(AppDbContext db, ILogger<AdminCategoriesController> logger, IAuditService audit)
     {
         _db = db;
         _logger = logger;
+        _audit = audit;
     }
 
     // Все категории, включая скрытые; создание, правка и удаление остались в CategoriesController
@@ -40,6 +43,8 @@ public class AdminCategoriesController : ControllerBase
             return NotFound(new { error = "Категория не найдена" });
 
         category.IsHidden = hidden;
+        _audit.Add(int.Parse(User.FindFirst("sub")!.Value), hidden ? "category.hide" : "category.show",
+            "Category", category.Id, category.Name);
         await _db.SaveChangesAsync();
 
         _logger.LogWarning("Администратор {AdminId} {Action} категорию {CategoryId}",

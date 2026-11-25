@@ -45,6 +45,13 @@ public class ServiceDto
     public string? PerformerAvatarUrl { get; set; }
     public string? PerformerSpecialization { get; set; }
     public bool PerformerIsVerified { get; set; }
+    public string? PerformerCity { get; set; }
+    public string? PerformerServiceArea { get; set; }
+    public double? PerformerLatitude { get; set; }
+    public double? PerformerLongitude { get; set; }
+
+    // Расстояние от точки пользователя в км; заполняется, только если в запросе есть lat и lng
+    public double? DistanceKm { get; set; }
 
     // Рейтинг считается по нескрытым отзывам; null, если отзывов ещё нет
     public decimal? Rating { get; set; }
@@ -60,7 +67,9 @@ public enum CatalogSort
     PriceAsc,
     PriceDesc,
     TitleAsc,
-    RatingDesc
+    RatingDesc,
+    // Сначала ближайшие; нужны lat и lng. Мастера без точки на карте идут в конце
+    Distance
 }
 
 // Параметры поиска в каталоге (приходят в адресе запроса)
@@ -73,6 +82,20 @@ public class CatalogQuery
 
     // Услуги одного мастера (для страницы мастера)
     public int? PerformerId { get; set; }
+
+    // Город или район мастера (часть названия, без учёта регистра)
+    [MaxLength(100)]
+    public string? Location { get; set; }
+
+    // Точка пользователя для расстояния, радиуса и сортировки «Ближайшие»
+    [Range(-90, 90)]
+    public double? Lat { get; set; }
+
+    [Range(-180, 180)]
+    public double? Lng { get; set; }
+
+    [Range(0.1, 20000)]
+    public double? RadiusKm { get; set; }
 
     [Range(0, 1000000)]
     public decimal? MinPrice { get; set; }

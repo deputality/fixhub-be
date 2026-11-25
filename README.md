@@ -125,11 +125,13 @@ dotnet test FixHub.sln
 |---|---|
 | Аутентификация | `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me` |
 | Категории | `GET/POST /api/categories`, `PUT/DELETE /api/categories/{id}` (изменение: Admin) |
-| Каталог | `GET /api/catalog`, `GET /api/catalog/{id}`, `GET /api/catalog/{id}/reviews` |
+| Каталог | `GET /api/catalog` (фильтры `location`, `lat`+`lng`, `radiusKm`; сортировка `Distance`), `GET /api/catalog/{id}`, `GET /api/catalog/{id}/reviews`, `GET /api/catalog/locations` |
 | Корзина | `GET /api/cart`, `POST /api/cart/items`, `PUT/DELETE /api/cart/items/{id}` |
-| Заказы клиента | `POST /api/orders`, `GET /api/orders/my`, `GET /api/orders/{id}`, `POST /api/orders/{id}/cancel` |
+| Заказы клиента | `POST /api/orders` (из корзины), `POST /api/orders/quick` (одна услуга без корзины), `GET /api/orders/my`, `GET /api/orders/{id}`, `POST /api/orders/{id}/cancel` |
 | Услуги исполнителя | `GET/POST /api/performer/services`, `PUT /api/performer/services/{id}`, `PATCH .../{id}/hide`, `PATCH .../{id}/show` |
 | Заказы исполнителя | `GET /api/performer/orders`, `POST /api/orders/{id}/confirm`, `.../start`, `.../complete`, `.../reject`, `GET /api/performer/stats` |
+| Портфолио мастера | `GET/POST /api/performer/portfolio`, `PUT/DELETE /api/performer/portfolio/{id}` (фото через `POST /api/performer/uploads`), публично: `GET /api/performers/{id}/portfolio` |
+| Избранное клиента | `GET /api/favorites`, `GET /api/favorites/ids`, `POST/DELETE /api/favorites/services/{id}`, `POST/DELETE /api/favorites/performers/{id}` |
 | Отзывы клиента | `POST /api/reviews`, `GET /api/reviews/my` |
 | Отзывы исполнителя | `GET /api/performer/reviews` (отзывы о себе и общий рейтинг) |
 | Уведомления | `GET /api/notifications` (`onlyUnread`, `page`, `pageSize`), `GET /api/notifications/unread-count`, `POST /api/notifications/{id}/read`, `POST /api/notifications/read-all` |
@@ -177,7 +179,7 @@ docker-compose.yml API + PostgreSQL
 
 ## База данных
 
-Сущности: User, Category (с вложенностью), Service, CartItem, Order, OrderItem, OrderStatusHistory, Review, Notification. ER-диаграмма: docs/fixhub - fixhub - public.png.
+Сущности: User, Category (с вложенностью), Service, CartItem, Order, OrderItem, OrderStatusHistory, Review, Notification, PortfolioItem, FavoriteService, FavoritePerformer. ER-диаграмма: docs/fixhub - fixhub - public.png.
 
 - Денежные значения хранятся в типе numeric (decimal), время в UTC.
 - Уникальный email пользователя; в корзине уникальная пара (клиент, услуга).
@@ -190,3 +192,11 @@ docker-compose.yml API + PostgreSQL
 Готово: регистрация, вход, JWT и роли; категории; услуги исполнителя; публичный каталог с поиском, фильтрами, сортировкой и рейтингом; корзина; оформление заказа в одной транзакции со статусами и историей; кабинеты клиента, исполнителя и администратора; отзывы и рейтинги с модерацией; уведомления внутри приложения; статистика административной панели; единый формат ошибок и журналирование; unit- и интеграционные тесты; ER-диаграмма и тестовые данные; запуск через Docker Compose.
 
 В планах (дополнительно): клиентская часть (fixhub-fe).
+
+## Превью ссылок (Open Graph)
+
+Фронтенд — SPA, а краулеры мессенджеров JavaScript не выполняют. Поэтому бэкенд отдаёт готовый HTML
+с заголовком, описанием и картинкой: `GET /share/services/{id}` и `GET /share/performers/{id}`.
+Людей эти адреса сразу перенаправляют на сайт (адрес берётся из `App:BaseUrl`). Фронтенд подставляет
+такие ссылки в кнопку «Поделиться». Чтобы превью работало и для обычных ссылок вида `/services/5`,
+настройте на веб-сервере отдачу `/share/...` для ботов (пример в README фронтенда).
