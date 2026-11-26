@@ -22,6 +22,7 @@ public class AuthController : ControllerBase
     private readonly IConfiguration _config;
     private readonly IHttpClientFactory _httpFactory;
     private readonly IEmailSender _email;
+    private readonly ILoginThrottle _throttle;
 
     public AuthController(
         AppDbContext db,
@@ -30,7 +31,8 @@ public class AuthController : ControllerBase
         ILogger<AuthController> logger,
         IConfiguration config,
         IHttpClientFactory httpFactory,
-        IEmailSender email)
+        IEmailSender email,
+        ILoginThrottle throttle)
     {
         _db = db;
         _hasher = hasher;
@@ -39,6 +41,7 @@ public class AuthController : ControllerBase
         _config = config;
         _httpFactory = httpFactory;
         _email = email;
+        _throttle = throttle;
     }
 
     [HttpPost("register")]
@@ -73,10 +76,24 @@ public class AuthController : ControllerBase
     public async Task<ActionResult<AuthResponse>> Login(LoginRequest request)
     {
         var email = request.Email.Trim().ToLowerInvariant();
+
+        // после серии неверных паролей вход для этого email закрыт на время, даже если следующий пароль верный
+        var wait = _throttle.GetLockRemaining(email);
+        if (wait != null)
+        {
+            var minutes = Math.Max(1, (int)Math.Ceiling(wait.Value.TotalMinutes));
+            Response.Headers.RetryAfter = ((int)Math.Ceiling(wait.Value.TotalSeconds)).ToString();
+            _logger.LogWarning("Вход временно закрыт из-за частых неверных паролей: {Email}", email);
+            return StatusCode(StatusCodes.Status429TooManyRequests,
+                new { error = $"Слишком много неудачных попыток входа. Повторите через {minutes} мин." });
+        }
+
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email);
 
         if (user == null)
         {
+            // считаем и несуществующие адреса: так по ответу не узнать, зарегистрирован ли email
+            _throttle.RegisterFailure(email);
             _logger.LogWarning("Неудачная попытка входа: {Email}", email);
             return Unauthorized(new { error = "Неверный email или пароль" });
         }
@@ -84,9 +101,12 @@ public class AuthController : ControllerBase
         var result = _hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
         if (result == PasswordVerificationResult.Failed)
         {
+            _throttle.RegisterFailure(email);
             _logger.LogWarning("Неудачная попытка входа: {Email}", email);
             return Unauthorized(new { error = "Неверный email или пароль" });
         }
+
+        _throttle.Reset(email);
 
         if (user.IsBlocked)
         {

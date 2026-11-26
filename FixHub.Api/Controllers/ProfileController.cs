@@ -5,6 +5,7 @@ using FixHub.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace FixHub.Api.Controllers;
 
@@ -15,11 +16,19 @@ public class ProfileController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly IPasswordHasher<User> _hasher;
+    private readonly IWebHostEnvironment _env;
+    private readonly ILogger<ProfileController> _logger;
 
-    public ProfileController(AppDbContext db, IPasswordHasher<User> hasher)
+    public ProfileController(
+        AppDbContext db,
+        IPasswordHasher<User> hasher,
+        IWebHostEnvironment env,
+        ILogger<ProfileController> logger)
     {
         _db = db;
         _hasher = hasher;
+        _env = env;
+        _logger = logger;
     }
 
     private int CurrentUserId => int.Parse(User.FindFirst("sub")!.Value);
@@ -90,6 +99,81 @@ public class ProfileController : ControllerBase
         user.PasswordHash = _hasher.HashPassword(user, request.NewPassword);
         await _db.SaveChangesAsync();
         return Ok(new { message = "Пароль изменён" });
+    }
+
+    // Удаление аккаунта. Заказы, отзывы и история связаны с другими людьми, поэтому строку пользователя
+    // не стираем, а обезличиваем: имя, почта, телефон, фото и документы удаляются, вход закрывается.
+    // Освободившийся email можно использовать для новой регистрации.
+    [HttpPost("delete")]
+    public async Task<IActionResult> DeleteAccount(DeleteAccountRequest request)
+    {
+        var user = await _db.Users.FindAsync(CurrentUserId);
+        if (user == null) return Unauthorized();
+
+        if (user.Role == UserRole.Admin)
+            return StatusCode(StatusCodes.Status403Forbidden,
+                new { error = "Учётную запись администратора удалить нельзя" });
+
+        var check = _hasher.VerifyHashedPassword(user, user.PasswordHash, request.Password);
+        if (check == PasswordVerificationResult.Failed)
+            return BadRequest(new { error = "Пароль указан неверно" });
+
+        var hasActiveOrders = await _db.Orders.AnyAsync(o =>
+            (o.ClientId == user.Id || o.PerformerId == user.Id)
+            && (o.Status == OrderStatus.New || o.Status == OrderStatus.Confirmed || o.Status == OrderStatus.InProgress));
+        if (hasActiveOrders)
+            return Conflict(new { error = "Есть незавершённые заказы. Завершите или отмените их, затем удалите аккаунт" });
+
+        var userId = user.Id;
+
+        // файлы документов лежат в закрытой папке, их стираем и с диска
+        var documents = await _db.VerificationDocuments.Where(d => d.UserId == userId).ToListAsync();
+        var privateDir = Path.Combine(_env.ContentRootPath, "private-uploads");
+        foreach (var document in documents)
+        {
+            try
+            {
+                var path = Path.Combine(privateDir, document.StoredName);
+                if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+            }
+            catch (IOException ex)
+            {
+                _logger.LogWarning(ex, "Не удалось удалить файл документа {DocumentId}", document.Id);
+            }
+        }
+        _db.VerificationDocuments.RemoveRange(documents);
+
+        _db.CartItems.RemoveRange(_db.CartItems.Where(c => c.ClientId == userId));
+        _db.FavoriteServices.RemoveRange(_db.FavoriteServices.Where(f => f.UserId == userId));
+        _db.FavoritePerformers.RemoveRange(_db.FavoritePerformers.Where(f => f.UserId == userId || f.PerformerId == userId));
+        _db.PasswordResetTokens.RemoveRange(_db.PasswordResetTokens.Where(t => t.UserId == userId));
+        _db.Notifications.RemoveRange(_db.Notifications.Where(n => n.UserId == userId));
+        _db.PortfolioItems.RemoveRange(_db.PortfolioItems.Where(p => p.PerformerId == userId));
+
+        // услуги мастера снимаем с публикации
+        foreach (var service in await _db.Services.Where(s => s.PerformerId == userId).ToListAsync())
+            service.IsActive = false;
+
+        user.Email = $"deleted-{userId}@deleted.invalid";
+        user.FullName = "Удалённый пользователь";
+        user.Phone = null;
+        user.Bio = null;
+        user.Specialization = null;
+        user.ExperienceYears = null;
+        user.City = null;
+        user.ServiceArea = null;
+        user.Latitude = null;
+        user.Longitude = null;
+        user.AvatarUrl = null;
+        user.IsVerified = false;
+        user.EmailNotifications = false;
+        user.IsBlocked = true;
+        user.PasswordHash = _hasher.HashPassword(user, Guid.NewGuid().ToString("N") + Guid.NewGuid().ToString("N"));
+
+        await _db.SaveChangesAsync();
+
+        _logger.LogInformation("Пользователь {UserId} удалил аккаунт", userId);
+        return Ok(new { message = "Аккаунт удалён" });
     }
 
     private static ProfileDto ToDto(User u) => new()

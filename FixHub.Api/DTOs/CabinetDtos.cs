@@ -138,3 +138,10 @@ public class ChangePasswordRequest
     [Required, MinLength(8), MaxLength(100)]
     public string NewPassword { get; set; } = null!;
 }
+
+public class DeleteAccountRequest
+{
+    // Пароль нужен, чтобы чужой человек с открытой вкладкой не смог удалить аккаунт
+    [Required]
+    public string Password { get; set; } = null!;
+}

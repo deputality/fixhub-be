@@ -133,6 +133,7 @@ try
     builder.Services.AddScoped<INotificationService, NotificationService>();
     builder.Services.AddScoped<IAuditService, AuditService>();
     builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
+    builder.Services.AddSingleton<ILoginThrottle, LoginThrottle>();
     builder.Services.AddHostedService<EmailNotificationWorker>();
 
     var app = builder.Build();
@@ -144,6 +145,7 @@ try
             ex != null || httpContext.Response.StatusCode >= 500
                 ? LogEventLevel.Error
                 : httpContext.Request.Path.StartsWithSegments("/swagger")
+                  || httpContext.Request.Path.StartsWithSegments("/health")
                     ? LogEventLevel.Verbose
                     : LogEventLevel.Information;
     });
@@ -188,6 +190,21 @@ try
     app.UseAuthorization();
 
     app.MapControllers();
+
+    // Проверка «приложение живо и база отвечает»: для Docker healthcheck и ручной проверки (http://localhost:8080/health)
+    app.MapGet("/health", async (AppDbContext db, CancellationToken ct) =>
+    {
+        try
+        {
+            return await db.Database.CanConnectAsync(ct)
+                ? Results.Ok(new { status = "ok" })
+                : Results.Json(new { status = "unhealthy" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+        catch (Exception)
+        {
+            return Results.Json(new { status = "unhealthy" }, statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+    }).AllowAnonymous();
 
     // Создание администратора при первом запуске
     using (var scope = app.Services.CreateScope())
