@@ -13,6 +13,17 @@ public class CreateReviewRequest
 
     [Required, MaxLength(2000)]
     public string Text { get; set; } = null!;
+
+    // До 3 фото; адреса берутся из ответа POST /api/uploads
+    [MaxLength(3, ErrorMessage = "К отзыву можно приложить не больше 3 фото")]
+    public List<string>? PhotoUrls { get; set; }
+}
+
+// Ответ мастера на отзыв
+public class ReviewReplyRequest
+{
+    [Required(ErrorMessage = "Напишите ответ"), MaxLength(1000)]
+    public string Text { get; set; } = null!;
 }
 
 // Отзыв в ответах API
@@ -31,6 +42,11 @@ public class ReviewDto
     public string Text { get; set; } = null!;
     public bool IsHidden { get; set; }
     public DateTime CreatedAt { get; set; }
+
+    public List<string> PhotoUrls { get; set; } = new();
+
+    public string? ReplyText { get; set; }
+    public DateTime? RepliedAt { get; set; }
 }
 
 // Отзывы об исполнителе с итоговым рейтингом

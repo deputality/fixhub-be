@@ -1,6 +1,9 @@
 ﻿using FixHub.Api.Data;
+using FixHub.Api.Services;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Npgsql;
 using Xunit;
 
@@ -19,6 +22,9 @@ public class ApiFixture : IAsyncLifetime
 
     public HttpClient Client { get; private set; } = null!;
 
+    // Вместо настоящей почты письма собираются здесь: из них тесты берут ссылку для сброса пароля
+    public FakeEmailSender Emails { get; } = new();
+
     public Task InitializeAsync()
     {
         // 1. Создаём пустую тестовую базу и накатываем миграции
@@ -31,7 +37,8 @@ public class ApiFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("ConnectionStrings__Default", ConnectionString);
 
         // 3. Запускаем приложение внутри теста (при старте создаётся администратор)
-        _factory = new WebApplicationFactory<Program>();
+        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services => services.AddSingleton<IEmailSender>(Emails)));
         Client = _factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             BaseAddress = new Uri("https://localhost")
@@ -59,6 +66,26 @@ public class ApiFixture : IAsyncLifetime
         new DbContextOptionsBuilder<AppDbContext>()
             .UseNpgsql(ConnectionString)
             .Options;
+}
+
+// Почтовый «отправитель» для тестов: ничего не отправляет, а запоминает письма
+public class FakeEmailSender : IEmailSender
+{
+    public record Mail(string To, string Subject, string Body);
+
+    private readonly System.Collections.Concurrent.ConcurrentQueue<Mail> _sent = new();
+
+    // false: фоновая рассылка уведомлений при тестах не запускается и не засоряет список
+    public bool IsConfigured => false;
+
+    public IReadOnlyList<Mail> To(string email) =>
+        _sent.Where(m => string.Equals(m.To, email, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    public Task SendAsync(string to, string subject, string body, CancellationToken ct = default)
+    {
+        _sent.Enqueue(new Mail(to, subject, body));
+        return Task.CompletedTask;
+    }
 }
 
 // Все интеграционные тесты входят в одну коллекцию: у них общая база и они идут по очереди

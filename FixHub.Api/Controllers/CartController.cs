@@ -1,6 +1,8 @@
-﻿using FixHub.Api.Data;
+﻿using FixHub.Api.Common;
+using FixHub.Api.Data;
 using FixHub.Api.DTOs;
 using FixHub.Api.Models;
+using FixHub.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -48,6 +50,14 @@ public class CartController : ControllerBase
         if (!service.IsActive || service.Performer.IsBlocked)
             return BadRequest(new { error = "Эта услуга недоступна для заказа" });
 
+        var desiredTime = TimeFormat.Parse(request.DesiredTime);
+        var slotError = await ScheduleRules.ValidateAsync(
+            _db, service.PerformerId, service.Title, request.DesiredDate, desiredTime, required: false);
+        if (slotError != null)
+            return BadRequest(new { error = slotError });
+        if (!await ScheduleRules.HasScheduleAsync(_db, service.PerformerId))
+            desiredTime = null;
+
         var item = await _db.CartItems
             .FirstOrDefaultAsync(c => c.ClientId == userId && c.ServiceId == service.Id);
 
@@ -59,6 +69,7 @@ public class CartController : ControllerBase
                 ServiceId = service.Id,
                 Quantity = request.Quantity,
                 DesiredDate = request.DesiredDate,
+                DesiredTime = desiredTime,
                 Comment = request.Comment?.Trim()
             });
         }
@@ -69,7 +80,11 @@ public class CartController : ControllerBase
                 return BadRequest(new { error = $"Количество не может быть больше {MaxQuantity}" });
 
             item.Quantity += request.Quantity;
-            if (request.DesiredDate != null) item.DesiredDate = request.DesiredDate;
+            if (request.DesiredDate != null)
+            {
+                item.DesiredDate = request.DesiredDate;
+                item.DesiredTime = desiredTime;
+            }
             if (!string.IsNullOrWhiteSpace(request.Comment)) item.Comment = request.Comment.Trim();
         }
 
@@ -96,13 +111,23 @@ public class CartController : ControllerBase
             return BadRequest(new { error = dateError });
 
         var item = await _db.CartItems
+            .Include(c => c.Service)
             .FirstOrDefaultAsync(c => c.Id == id && c.ClientId == userId);
 
         if (item == null)
             return NotFound(new { error = "Позиция корзины не найдена" });
 
+        var desiredTime = TimeFormat.Parse(request.DesiredTime);
+        var slotError = await ScheduleRules.ValidateAsync(
+            _db, item.Service.PerformerId, item.Service.Title, request.DesiredDate, desiredTime, required: false);
+        if (slotError != null)
+            return BadRequest(new { error = slotError });
+        if (!await ScheduleRules.HasScheduleAsync(_db, item.Service.PerformerId))
+            desiredTime = null;
+
         item.Quantity = request.Quantity;
         item.DesiredDate = request.DesiredDate;
+        item.DesiredTime = desiredTime;
         item.Comment = request.Comment?.Trim();
 
         await _db.SaveChangesAsync();
@@ -162,6 +187,7 @@ public class CartController : ControllerBase
                 Quantity = c.Quantity,
                 LineTotal = c.Service.Price * c.Quantity,
                 DesiredDate = c.DesiredDate,
+                DesiredTimeValue = c.DesiredTime,
                 Comment = c.Comment,
                 IsAvailable = c.Service.IsActive && !c.Service.Performer.IsBlocked
             })

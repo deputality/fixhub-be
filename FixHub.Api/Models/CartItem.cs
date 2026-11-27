@@ -12,5 +12,6 @@ public class CartItem
 
     public int Quantity { get; set; } = 1;
     public DateOnly? DesiredDate { get; set; }
+    public TimeOnly? DesiredTime { get; set; }
     public string? Comment { get; set; }
 }

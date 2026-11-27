@@ -26,5 +26,11 @@ public class Review
     // Администратор может скрыть отзыв: скрытый не показывается и не входит в рейтинг
     public bool IsHidden { get; set; }
 
+    // Публичный ответ мастера на отзыв
+    public string? ReplyText { get; set; }
+    public DateTime? RepliedAt { get; set; }
+
+    public List<ReviewPhoto> Photos { get; set; } = new();
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

@@ -15,5 +15,8 @@ public class OrderItem
     public int Quantity { get; set; }
 
     public DateOnly? DesiredDate { get; set; }
+
+    // Время слота из расписания мастера (начало часового окна); null, если слот не выбирали
+    public TimeOnly? DesiredTime { get; set; }
     public string? Comment { get; set; }
 }

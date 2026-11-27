@@ -483,3 +483,6 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 logs/
+
+# документы мастеров для проверки: в репозиторий попадать не должны
+FixHub.Api/private-uploads/

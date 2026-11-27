@@ -14,11 +14,13 @@ public class AdminReviewsController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly ILogger<AdminReviewsController> _logger;
+    private readonly IAuditService _audit;
 
-    public AdminReviewsController(AppDbContext db, ILogger<AdminReviewsController> logger)
+    public AdminReviewsController(AppDbContext db, ILogger<AdminReviewsController> logger, IAuditService audit)
     {
         _db = db;
         _logger = logger;
+        _audit = audit;
     }
 
     // Все отзывы, включая скрытые; можно отфильтровать по признаку «скрыт»
@@ -62,6 +64,8 @@ public class AdminReviewsController : ControllerBase
             return NotFound(new { error = "Отзыв не найден" });
 
         review.IsHidden = hidden;
+        _audit.Add(int.Parse(User.FindFirst("sub")!.Value), hidden ? "review.hide" : "review.show",
+            "Review", review.Id, $"Отзыв №{review.Id}");
         await _db.SaveChangesAsync();
 
         _logger.LogWarning("Администратор {AdminId} {Action} отзыв {ReviewId}",

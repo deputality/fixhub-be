@@ -19,44 +19,14 @@ public class CatalogController : ControllerBase
         _db = db;
     }
 
-    // Рейтинг считается запросом по нескрытым отзывам; если отзывов нет, рейтинг null
-    private Expression<Func<Service, ServiceDto>> ToDto => s => new ServiceDto
-    {
-        Id = s.Id,
-        Title = s.Title,
-        Description = s.Description,
-        PhotoUrl = s.PhotoUrl,
-        Price = s.Price,
-        Unit = s.Unit.ToString(),
-        IsActive = s.IsActive,
-        CreatedAt = s.CreatedAt,
-        CategoryId = s.CategoryId,
-        CategoryName = s.Category.Name,
-        PerformerId = s.PerformerId,
-        PerformerName = s.Performer.FullName,
-        PerformerAvatarUrl = s.Performer.AvatarUrl,
-        PerformerSpecialization = s.Performer.Specialization,
-        PerformerIsVerified = s.Performer.IsVerified,
-        Rating = _db.Reviews
-            .Where(r => r.ServiceId == s.Id && !r.IsHidden)
-            .Average(r => (decimal?)r.Rating),
-        ReviewCount = _db.Reviews
-            .Count(r => r.ServiceId == s.Id && !r.IsHidden),
-        PerformerRating = _db.Reviews
-            .Where(r => r.PerformerId == s.PerformerId && !r.IsHidden)
-            .Average(r => (decimal?)r.Rating),
-        PerformerReviewCount = _db.Reviews
-            .Count(r => r.PerformerId == s.PerformerId && !r.IsHidden)
-    };
+    private Expression<Func<Service, ServiceDto>> ToDto => ServiceProjection.ToDto(_db);
 
     // В каталог попадают только активные услуги незаблокированных исполнителей
     // из нескрытых категорий
     private IQueryable<Service> Visible() =>
         _db.Services
             .AsNoTracking()
-            .Where(s => s.IsActive && !s.Performer.IsBlocked
-                && !s.Category.IsHidden
-                && (s.Category.Parent == null || !s.Category.Parent.IsHidden));
+            .Where(ServiceProjection.IsVisible);
 
     [HttpGet]
     public async Task<ActionResult<PagedResult<ServiceDto>>> Search([FromQuery] CatalogQuery query)
@@ -64,7 +34,28 @@ public class CatalogController : ControllerBase
         if (query.MinPrice != null && query.MaxPrice != null && query.MinPrice > query.MaxPrice)
             return BadRequest(new { error = "Минимальная цена не может быть больше максимальной" });
 
+        if ((query.Lat == null) != (query.Lng == null))
+            return BadRequest(new { error = "Укажите и широту, и долготу" });
+
+        var hasPoint = query.Lat != null && query.Lng != null;
+        if (!hasPoint && (query.RadiusKm != null || query.Sort == CatalogSort.Distance))
+            return BadRequest(new { error = "Для поиска по расстоянию нужна точка на карте (lat и lng)" });
+
         var q = Visible();
+
+        if (!string.IsNullOrWhiteSpace(query.Location))
+        {
+            var place = $"%{EscapeLike(query.Location.Trim())}%";
+            q = q.Where(s => EF.Functions.ILike(s.Performer.City!, place)
+                          || EF.Functions.ILike(s.Performer.ServiceArea!, place));
+        }
+
+        // выражение расстояния нужно и для радиуса, и для сортировки
+        var distance = hasPoint ? GeoMath.DistanceFrom(query.Lat!.Value, query.Lng!.Value) : null;
+
+        // мастера без точки на карте под радиус не попадают (расстояние у них NULL)
+        if (hasPoint && query.RadiusKm != null)
+            q = q.Where(GeoMath.Within(query.Lat!.Value, query.Lng!.Value, query.RadiusKm.Value));
 
         if (!string.IsNullOrWhiteSpace(query.Search))
         {
@@ -114,6 +105,9 @@ public class CatalogController : ControllerBase
                     .Average(r => (decimal?)r.Rating))
                 .ThenByDescending(s => _db.Reviews.Count(r => r.ServiceId == s.Id && !r.IsHidden))
                 .ThenBy(s => s.Id),
+            // NULL в PostgreSQL при сортировке по возрастанию идёт в конце,
+            // то есть мастера без точки на карте оказываются последними
+            CatalogSort.Distance => q.OrderBy(distance!).ThenBy(s => s.Id),
             _ => q.OrderByDescending(s => s.CreatedAt).ThenBy(s => s.Id)
         };
 
@@ -125,6 +119,9 @@ public class CatalogController : ControllerBase
 
         items.ForEach(RoundRatings);
 
+        if (hasPoint)
+            items.ForEach(s => s.DistanceKm = DistanceTo(s, query.Lat!.Value, query.Lng!.Value));
+
         return Ok(new PagedResult<ServiceDto>
         {
             Items = items,
@@ -133,6 +130,20 @@ public class CatalogController : ControllerBase
             TotalCount = totalCount,
             TotalPages = (int)Math.Ceiling(totalCount / (double)query.PageSize)
         });
+    }
+
+    // Города мастеров, чьи услуги сейчас есть в каталоге: для подсказок в поиске
+    [HttpGet("locations")]
+    public async Task<ActionResult<List<string>>> GetLocations()
+    {
+        var cities = await Visible()
+            .Where(s => s.Performer.City != null && s.Performer.City != "")
+            .Select(s => s.Performer.City!)
+            .Distinct()
+            .OrderBy(c => c)
+            .ToListAsync();
+
+        return Ok(cities);
     }
 
     [HttpGet("{id:int}")]
@@ -181,11 +192,12 @@ public class CatalogController : ControllerBase
         });
     }
 
-    private static void RoundRatings(ServiceDto s)
-    {
-        s.Rating = ReviewProjection.Round(s.Rating);
-        s.PerformerRating = ReviewProjection.Round(s.PerformerRating);
-    }
+    private static double? DistanceTo(ServiceDto s, double lat, double lng) =>
+        s.PerformerLatitude == null || s.PerformerLongitude == null
+            ? null
+            : Math.Round(GeoMath.DistanceKm(lat, lng, s.PerformerLatitude.Value, s.PerformerLongitude.Value), 1);
+
+    private static void RoundRatings(ServiceDto s) => ServiceProjection.RoundRatings(s);
 
     // Спецсимволы LIKE (% и _) в поиске должны считаться обычными буквами
     private static string EscapeLike(string value) =>

@@ -34,6 +34,8 @@ public class PerformersController : ControllerBase
                 ExperienceYears = u.ExperienceYears,
                 City = u.City,
                 ServiceArea = u.ServiceArea,
+                Latitude = u.Latitude,
+                Longitude = u.Longitude,
                 Bio = u.Bio,
                 AvatarUrl = u.AvatarUrl,
                 IsVerified = u.IsVerified,
@@ -57,5 +59,25 @@ public class PerformersController : ControllerBase
 
         performer.Rating = ReviewProjection.Round(performer.Rating);
         return Ok(performer);
+    }
+
+    // Работы мастера «до/после»: публичный список, новые первыми
+    [HttpGet("{id:int}/portfolio")]
+    public async Task<ActionResult<List<PortfolioItemDto>>> GetPortfolio(int id)
+    {
+        var exists = await _db.Users
+            .AnyAsync(u => u.Id == id && u.Role == UserRole.Performer && !u.IsBlocked);
+
+        if (!exists)
+            return NotFound(new { error = "Мастер не найден" });
+
+        var items = await _db.PortfolioItems
+            .AsNoTracking()
+            .Include(p => p.Photos)
+            .Where(p => p.PerformerId == id)
+            .OrderByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id)
+            .ToListAsync();
+
+        return Ok(items.Select(PortfolioController.ToDto).ToList());
     }
 }

@@ -8,9 +8,13 @@ public abstract class IntegrationTestBase
 
     protected HttpClient Client { get; }
 
+    // Письма, которые «отправило» приложение во время теста
+    protected FakeEmailSender Emails { get; }
+
     protected IntegrationTestBase(ApiFixture fixture)
     {
         Client = fixture.Client;
+        Emails = fixture.Emails;
     }
 
     // Уникальные значения, чтобы тесты не мешали друг другу
@@ -87,5 +91,8 @@ public abstract class IntegrationTestBase
 
     // action: confirm, start, complete, reject, cancel
     protected Task<HttpResponseMessage> OrderActionAsync(string token, int orderId, string action) =>
-        Client.CallAsync(HttpMethod.Post, $"/api/orders/{orderId}/{action}", token: token);
+        Client.CallAsync(HttpMethod.Post, $"/api/orders/{orderId}/{action}",
+            // при отмене и отклонении причина обязательна
+            action is "cancel" or "reject" ? new { reason = "Test reason" } : null,
+            token);
 }

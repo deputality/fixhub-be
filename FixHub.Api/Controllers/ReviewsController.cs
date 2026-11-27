@@ -24,6 +24,14 @@ public class ReviewsController : ControllerBase
         _notifications = notifications;
     }
 
+    private const int MaxPhotos = 3;
+
+    private static bool IsUploadUrl(string url) =>
+        url.Length <= 300
+        && url.StartsWith("/uploads/", StringComparison.Ordinal)
+        && !url.Contains("..")
+        && !url.Contains('\\');
+
     private int CurrentUserId => int.Parse(User.FindFirst("sub")!.Value);
 
     // ---------- Клиент: оставить отзыв ----------
@@ -56,6 +64,17 @@ public class ReviewsController : ControllerBase
         if (await _db.Reviews.AnyAsync(r => r.OrderItemId == item.Id))
             return Conflict(new { error = "Отзыв на эту позицию уже оставлен" });
 
+        var photoUrls = (request.PhotoUrls ?? new List<string>())
+            .Select(u => u?.Trim() ?? "")
+            .Where(u => u.Length > 0)
+            .Distinct()
+            .ToList();
+
+        if (photoUrls.Count > MaxPhotos)
+            return BadRequest(new { error = $"К отзыву можно приложить не больше {MaxPhotos} фото" });
+        if (photoUrls.Any(u => !IsUploadUrl(u)))
+            return BadRequest(new { error = "Некорректный адрес фото" });
+
         var review = new Review
         {
             OrderItemId = item.Id,
@@ -65,7 +84,10 @@ public class ReviewsController : ControllerBase
             Rating = request.Rating,
             Text = request.Text.Trim(),
             IsHidden = false,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            Photos = photoUrls
+                .Select((u, i) => new ReviewPhoto { Url = u, SortOrder = i })
+                .ToList()
         };
 
         _db.Reviews.Add(review);
@@ -160,4 +182,61 @@ public class ReviewsController : ControllerBase
             }
         });
     }
+
+    // ---------- Исполнитель: публичный ответ на отзыв ----------
+
+    // Создаёт ответ или меняет уже написанный
+    [Authorize(Roles = "Performer")]
+    [HttpPost("~/api/performer/reviews/{id:int}/reply")]
+    public async Task<ActionResult<ReviewDto>> Reply(int id, ReviewReplyRequest request)
+    {
+        var userId = CurrentUserId;
+
+        var text = request.Text.Trim();
+        if (text.Length == 0)
+            return BadRequest(new { error = "Напишите ответ" });
+
+        // чужой отзыв для мастера «не существует»
+        var review = await _db.Reviews.FirstOrDefaultAsync(r => r.Id == id && r.PerformerId == userId);
+        if (review == null)
+            return NotFound(new { error = "Отзыв не найден" });
+
+        var isNew = review.ReplyText == null;
+        review.ReplyText = text;
+        review.RepliedAt = DateTime.UtcNow;
+
+        if (isNew)
+            _notifications.Add(
+                review.ClientId,
+                NotificationType.ReviewReply,
+                "Мастер ответил на ваш отзыв",
+                reviewId: review.Id);
+
+        await _db.SaveChangesAsync();
+
+        return Ok(await LoadAsync(id));
+    }
+
+    [Authorize(Roles = "Performer")]
+    [HttpDelete("~/api/performer/reviews/{id:int}/reply")]
+    public async Task<ActionResult<ReviewDto>> DeleteReply(int id)
+    {
+        var userId = CurrentUserId;
+
+        var review = await _db.Reviews.FirstOrDefaultAsync(r => r.Id == id && r.PerformerId == userId);
+        if (review == null)
+            return NotFound(new { error = "Отзыв не найден" });
+
+        review.ReplyText = null;
+        review.RepliedAt = null;
+        await _db.SaveChangesAsync();
+
+        return Ok(await LoadAsync(id));
+    }
+
+    private Task<ReviewDto> LoadAsync(int id) =>
+        _db.Reviews.AsNoTracking()
+            .Where(r => r.Id == id)
+            .Select(ReviewProjection.ToDto)
+            .FirstAsync();
 }

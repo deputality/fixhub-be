@@ -28,5 +28,24 @@ public enum NotificationType
     OrderStatusChanged = 2,
     NewReview = 3,
     ProfileVerified = 4,
-    NewMessage = 5
+    NewMessage = 5,
+    NewOffer = 6,
+    OfferAccepted = 7,
+    ReviewReply = 8
+}
+
+// Заявка клиента «назовите цену»
+public enum RequestStatus
+{
+    Open = 1,
+    Chosen = 2,
+    Cancelled = 3
+}
+
+public enum OfferStatus
+{
+    Pending = 1,
+    Accepted = 2,
+    Rejected = 3,
+    Withdrawn = 4
 }
