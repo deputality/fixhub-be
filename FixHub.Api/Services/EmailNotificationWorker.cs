@@ -74,7 +74,7 @@ public class EmailNotificationWorker : BackgroundService
 
             var path = n.User.Role == UserRole.Performer
                 ? (n.ReviewId != null ? "/performer/reviews" : "/performer/orders")
-                : "/orders";
+                : n.Type == NotificationType.NewOffer ? "/requests" : "/orders";
 
             var firstName = n.User.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
             var body = $"Здравствуйте, {firstName}!\n\n{n.Text}\n\n" +

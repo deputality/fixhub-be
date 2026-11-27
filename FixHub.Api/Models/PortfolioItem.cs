@@ -14,5 +14,8 @@ public class PortfolioItem
     public string? BeforeUrl { get; set; }
     public string AfterUrl { get; set; } = null!;
 
+    // Дополнительные фото работы (кроме «до» и «после»)
+    public List<PortfolioPhoto> Photos { get; set; } = new();
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

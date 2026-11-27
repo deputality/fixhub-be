@@ -5,7 +5,8 @@ namespace FixHub.Api.Controllers;
 
 [ApiController]
 [Route("api/performer/uploads")]
-[Authorize(Roles = "Performer")]
+[Route("api/uploads")]
+[Authorize(Roles = "Client,Performer")]
 public class UploadsController : ControllerBase
 {
     private const long MaxBytes = 5 * 1024 * 1024;
@@ -35,7 +36,7 @@ public class UploadsController : ControllerBase
         int read;
         await using (var stream = file.OpenReadStream())
         {
-            read = await stream.ReadAsync(header, 0, header.Length);
+            read = await stream.ReadAsync(header.AsMemory());
         }
 
         string? extension = null;

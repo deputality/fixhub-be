@@ -17,6 +17,10 @@ public class PortfolioItemRequest
 
     [Required, MaxLength(300)]
     public string AfterUrl { get; set; } = null!;
+
+    // Дополнительные фото работы, до 10 штук
+    [MaxLength(10, ErrorMessage = "Дополнительных фото не больше 10")]
+    public List<string>? PhotoUrls { get; set; }
 }
 
 public class PortfolioItemDto
@@ -26,5 +30,6 @@ public class PortfolioItemDto
     public string? Description { get; set; }
     public string? BeforeUrl { get; set; }
     public string AfterUrl { get; set; } = null!;
+    public List<string> PhotoUrls { get; set; } = new();
     public DateTime CreatedAt { get; set; }
 }

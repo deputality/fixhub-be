@@ -186,6 +186,9 @@ namespace FixHub.Api.Migrations
                     b.Property<DateOnly?>("DesiredDate")
                         .HasColumnType("date");
 
+                    b.Property<TimeOnly?>("DesiredTime")
+                        .HasColumnType("time without time zone");
+
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
@@ -352,6 +355,9 @@ namespace FixHub.Api.Migrations
                     b.Property<int?>("OrderId")
                         .HasColumnType("integer");
 
+                    b.Property<int?>("RequestId")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("ReviewId")
                         .HasColumnType("integer");
 
@@ -440,6 +446,9 @@ namespace FixHub.Api.Migrations
                     b.Property<DateOnly?>("DesiredDate")
                         .HasColumnType("date");
 
+                    b.Property<TimeOnly?>("DesiredTime")
+                        .HasColumnType("time without time zone");
+
                     b.Property<int>("OrderId")
                         .HasColumnType("integer");
 
@@ -461,6 +470,8 @@ namespace FixHub.Api.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OrderId");
+
+                    b.HasIndex("DesiredDate", "DesiredTime");
 
                     b.HasIndex("ServiceId");
 
@@ -525,6 +536,10 @@ namespace FixHub.Api.Migrations
                     b.Property<int>("OrderId")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("ToStatus")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -574,6 +589,201 @@ namespace FixHub.Api.Migrations
                     b.ToTable("PasswordResetTokens");
                 });
 
+            modelBuilder.Entity("FixHub.Api.Models.PortfolioPhoto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("PortfolioItemId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PortfolioItemId");
+
+                    b.ToTable("PortfolioPhotos");
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.PriceOffer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("PerformerId")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(10, 2)
+                        .HasColumnType("numeric(10,2)");
+
+                    b.Property<int>("RequestId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ServiceId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PerformerId");
+
+                    b.HasIndex("ServiceId");
+
+                    b.HasIndex("RequestId", "PerformerId")
+                        .IsUnique();
+
+                    b.ToTable("PriceOffers", t =>
+                        {
+                            t.HasCheckConstraint("CK_PriceOffers_Price", "\"Price\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.PriceRequest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("CategoryId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ClientId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ContactName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ContactPhone")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateOnly?>("DesiredDate")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("OrderId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("ClientId", "CreatedAt");
+
+                    b.HasIndex("Status", "CategoryId");
+
+                    b.ToTable("PriceRequests");
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.ReviewPhoto", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ReviewId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReviewId");
+
+                    b.ToTable("ReviewPhotos");
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.WorkingHours", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DayOfWeek")
+                        .HasColumnType("integer");
+
+                    b.Property<TimeOnly>("EndTime")
+                        .HasColumnType("time without time zone");
+
+                    b.Property<int>("PerformerId")
+                        .HasColumnType("integer");
+
+                    b.Property<TimeOnly>("StartTime")
+                        .HasColumnType("time without time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PerformerId", "DayOfWeek")
+                        .IsUnique();
+
+                    b.ToTable("WorkingHours", t =>
+                        {
+                            t.HasCheckConstraint("CK_WorkingHours_DayOfWeek", "\"DayOfWeek\" BETWEEN 1 AND 7");
+                        });
+                });
+
             modelBuilder.Entity("FixHub.Api.Models.Review", b =>
                 {
                     b.Property<int>("Id")
@@ -599,6 +809,13 @@ namespace FixHub.Api.Migrations
 
                     b.Property<int>("Rating")
                         .HasColumnType("integer");
+
+                    b.Property<DateTime?>("RepliedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReplyText")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
 
                     b.Property<int>("ServiceId")
                         .HasColumnType("integer");
@@ -938,6 +1155,85 @@ namespace FixHub.Api.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("FixHub.Api.Models.PortfolioPhoto", b =>
+                {
+                    b.HasOne("FixHub.Api.Models.PortfolioItem", "PortfolioItem")
+                        .WithMany("Photos")
+                        .HasForeignKey("PortfolioItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PortfolioItem");
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.PriceOffer", b =>
+                {
+                    b.HasOne("FixHub.Api.Models.User", "Performer")
+                        .WithMany()
+                        .HasForeignKey("PerformerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FixHub.Api.Models.PriceRequest", "Request")
+                        .WithMany("Offers")
+                        .HasForeignKey("RequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("FixHub.Api.Models.Service", "Service")
+                        .WithMany()
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Performer");
+
+                    b.Navigation("Request");
+
+                    b.Navigation("Service");
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.PriceRequest", b =>
+                {
+                    b.HasOne("FixHub.Api.Models.Category", "Category")
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("FixHub.Api.Models.User", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Category");
+
+                    b.Navigation("Client");
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.ReviewPhoto", b =>
+                {
+                    b.HasOne("FixHub.Api.Models.Review", "Review")
+                        .WithMany("Photos")
+                        .HasForeignKey("ReviewId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Review");
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.WorkingHours", b =>
+                {
+                    b.HasOne("FixHub.Api.Models.User", "Performer")
+                        .WithMany()
+                        .HasForeignKey("PerformerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Performer");
+                });
+
             modelBuilder.Entity("FixHub.Api.Models.Review", b =>
                 {
                     b.HasOne("FixHub.Api.Models.User", "Client")
@@ -995,6 +1291,21 @@ namespace FixHub.Api.Migrations
             modelBuilder.Entity("FixHub.Api.Models.Category", b =>
                 {
                     b.Navigation("Children");
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.PortfolioItem", b =>
+                {
+                    b.Navigation("Photos");
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.PriceRequest", b =>
+                {
+                    b.Navigation("Offers");
+                });
+
+            modelBuilder.Entity("FixHub.Api.Models.Review", b =>
+                {
+                    b.Navigation("Photos");
                 });
 
             modelBuilder.Entity("FixHub.Api.Models.Order", b =>

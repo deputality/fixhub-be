@@ -73,6 +73,7 @@ public class PerformersController : ControllerBase
 
         var items = await _db.PortfolioItems
             .AsNoTracking()
+            .Include(p => p.Photos)
             .Where(p => p.PerformerId == id)
             .OrderByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id)
             .ToListAsync();

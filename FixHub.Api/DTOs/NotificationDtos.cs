@@ -9,6 +9,7 @@ public class NotificationDto
     public string Text { get; set; } = null!;
     public int? OrderId { get; set; }
     public int? ReviewId { get; set; }
+    public int? RequestId { get; set; }
     public bool IsRead { get; set; }
     public DateTime CreatedAt { get; set; }
 }

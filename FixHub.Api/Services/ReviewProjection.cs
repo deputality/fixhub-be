@@ -18,7 +18,10 @@ public static class ReviewProjection
         Rating = r.Rating,
         Text = r.Text,
         IsHidden = r.IsHidden,
-        CreatedAt = r.CreatedAt
+        CreatedAt = r.CreatedAt,
+        PhotoUrls = r.Photos.OrderBy(p => p.SortOrder).ThenBy(p => p.Id).Select(p => p.Url).ToList(),
+        ReplyText = r.ReplyText,
+        RepliedAt = r.RepliedAt
     };
 
     // Рейтинг показываем с одним знаком после запятой

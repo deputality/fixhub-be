@@ -72,7 +72,7 @@ public class VerificationController : ControllerBase
         int read;
         await using (var stream = file.OpenReadStream())
         {
-            read = await stream.ReadAsync(header, 0, header.Length);
+            read = await stream.ReadAsync(header.AsMemory());
         }
 
         string? extension = null;

@@ -149,6 +149,23 @@ public class ProfileController : ControllerBase
         _db.PasswordResetTokens.RemoveRange(_db.PasswordResetTokens.Where(t => t.UserId == userId));
         _db.Notifications.RemoveRange(_db.Notifications.Where(n => n.UserId == userId));
         _db.PortfolioItems.RemoveRange(_db.PortfolioItems.Where(p => p.PerformerId == userId));
+        _db.WorkingHours.RemoveRange(_db.WorkingHours.Where(w => w.PerformerId == userId));
+
+        // открытые заявки на цену закрываем, ожидающие предложения мастера отзываем
+        foreach (var priceRequest in await _db.PriceRequests
+                     .Include(r => r.Offers)
+                     .Where(r => r.ClientId == userId && r.Status == RequestStatus.Open)
+                     .ToListAsync())
+        {
+            priceRequest.Status = RequestStatus.Cancelled;
+            foreach (var offer in priceRequest.Offers.Where(o => o.Status == OfferStatus.Pending))
+                offer.Status = OfferStatus.Rejected;
+        }
+
+        foreach (var offer in await _db.PriceOffers
+                     .Where(o => o.PerformerId == userId && o.Status == OfferStatus.Pending)
+                     .ToListAsync())
+            offer.Status = OfferStatus.Withdrawn;
 
         // услуги мастера снимаем с публикации
         foreach (var service in await _db.Services.Where(s => s.PerformerId == userId).ToListAsync())

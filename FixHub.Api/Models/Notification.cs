@@ -15,6 +15,7 @@ public class Notification
     // Внешних ключей нет: это просто ссылки для удобства.
     public int? OrderId { get; set; }
     public int? ReviewId { get; set; }
+    public int? RequestId { get; set; }
 
     public bool IsRead { get; set; }
 

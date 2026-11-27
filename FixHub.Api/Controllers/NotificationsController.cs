@@ -29,6 +29,7 @@ public class NotificationsController : ControllerBase
         Text = n.Text,
         OrderId = n.OrderId,
         ReviewId = n.ReviewId,
+        RequestId = n.RequestId,
         IsRead = n.IsRead,
         CreatedAt = n.CreatedAt
     };

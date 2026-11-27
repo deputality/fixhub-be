@@ -15,6 +15,7 @@ namespace FixHub.Api.Controllers;
 public class PortfolioController : ControllerBase
 {
     private const int MaxItems = 30;
+    private const int MaxExtraPhotos = 10;
     private const string UploadsPrefix = "/uploads/";
 
     private readonly AppDbContext _db;
@@ -33,6 +34,7 @@ public class PortfolioController : ControllerBase
 
         var items = await _db.PortfolioItems
             .AsNoTracking()
+            .Include(p => p.Photos)
             .Where(p => p.PerformerId == userId)
             .OrderByDescending(p => p.CreatedAt).ThenByDescending(p => p.Id)
             .ToListAsync();
@@ -58,7 +60,8 @@ public class PortfolioController : ControllerBase
             Title = request.Title.Trim(),
             Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             BeforeUrl = string.IsNullOrWhiteSpace(request.BeforeUrl) ? null : request.BeforeUrl.Trim(),
-            AfterUrl = request.AfterUrl.Trim()
+            AfterUrl = request.AfterUrl.Trim(),
+            Photos = BuildPhotos(request)
         };
 
         _db.PortfolioItems.Add(item);
@@ -75,7 +78,9 @@ public class PortfolioController : ControllerBase
             return BadRequest(new { error });
 
         var userId = CurrentUserId;
-        var item = await _db.PortfolioItems.FirstOrDefaultAsync(p => p.Id == id && p.PerformerId == userId);
+        var item = await _db.PortfolioItems
+            .Include(p => p.Photos)
+            .FirstOrDefaultAsync(p => p.Id == id && p.PerformerId == userId);
 
         if (item == null)
             return NotFound(new { error = "Работа не найдена" });
@@ -84,6 +89,10 @@ public class PortfolioController : ControllerBase
         item.Description = string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim();
         item.BeforeUrl = string.IsNullOrWhiteSpace(request.BeforeUrl) ? null : request.BeforeUrl.Trim();
         item.AfterUrl = request.AfterUrl.Trim();
+
+        // список доп. фото заменяется целиком
+        _db.PortfolioPhotos.RemoveRange(item.Photos);
+        item.Photos = BuildPhotos(request);
 
         await _db.SaveChangesAsync();
         return Ok(ToDto(item));
@@ -115,8 +124,22 @@ public class PortfolioController : ControllerBase
         if (!string.IsNullOrWhiteSpace(request.BeforeUrl) && !IsUploadUrl(request.BeforeUrl))
             return "Некорректное фото «до»";
 
+        var extra = request.PhotoUrls ?? new List<string>();
+        if (extra.Count > MaxExtraPhotos)
+            return $"Дополнительных фото не больше {MaxExtraPhotos}";
+
+        if (extra.Any(u => !IsUploadUrl(u)))
+            return "Некорректное дополнительное фото";
+
         return null;
     }
+
+    private static List<PortfolioPhoto> BuildPhotos(PortfolioItemRequest request) =>
+        (request.PhotoUrls ?? new List<string>())
+            .Select(u => u.Trim())
+            .Distinct()
+            .Select((u, i) => new PortfolioPhoto { Url = u, SortOrder = i })
+            .ToList();
 
     private static bool IsUploadUrl(string? url) =>
         !string.IsNullOrWhiteSpace(url)
@@ -131,6 +154,7 @@ public class PortfolioController : ControllerBase
         Description = p.Description,
         BeforeUrl = p.BeforeUrl,
         AfterUrl = p.AfterUrl,
+        PhotoUrls = p.Photos.OrderBy(x => x.SortOrder).ThenBy(x => x.Id).Select(x => x.Url).ToList(),
         CreatedAt = p.CreatedAt
     };
 }

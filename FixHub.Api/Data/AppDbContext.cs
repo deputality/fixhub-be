@@ -18,7 +18,12 @@ public class AppDbContext : DbContext
     public DbSet<OrderStatusHistory> OrderStatusHistory => Set<OrderStatusHistory>();
     public DbSet<OrderMessage> OrderMessages => Set<OrderMessage>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<ReviewPhoto> ReviewPhotos => Set<ReviewPhoto>();
     public DbSet<PortfolioItem> PortfolioItems => Set<PortfolioItem>();
+    public DbSet<PortfolioPhoto> PortfolioPhotos => Set<PortfolioPhoto>();
+    public DbSet<WorkingHours> WorkingHours => Set<WorkingHours>();
+    public DbSet<PriceRequest> PriceRequests => Set<PriceRequest>();
+    public DbSet<PriceOffer> PriceOffers => Set<PriceOffer>();
     public DbSet<FavoriteService> FavoriteServices => Set<FavoriteService>();
     public DbSet<FavoritePerformer> FavoritePerformers => Set<FavoritePerformer>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
@@ -141,6 +146,9 @@ public class AppDbContext : DbContext
 
             e.HasIndex(x => x.OrderId);
 
+            // занятость слотов мастера считается по дате и времени позиций его заказов
+            e.HasIndex(x => new { x.DesiredDate, x.DesiredTime });
+
             e.ToTable(t => t.HasCheckConstraint("CK_OrderItems_Quantity", "\"Quantity\" > 0"));
         });
 
@@ -150,6 +158,7 @@ public class AppDbContext : DbContext
 
             e.Property(x => x.FromStatus).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.ToStatus).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Reason).HasMaxLength(500);
 
             e.HasOne(x => x.Order)
                 .WithMany(x => x.History)
@@ -182,6 +191,7 @@ public class AppDbContext : DbContext
         b.Entity<Review>(e =>
         {
             e.Property(x => x.Text).HasMaxLength(2000).IsRequired();
+            e.Property(x => x.ReplyText).HasMaxLength(1000);
 
             // Один отзыв на одну позицию заказа
             e.HasIndex(x => x.OrderItemId).IsUnique();
@@ -213,6 +223,95 @@ public class AppDbContext : DbContext
 
             // Оценка от 1 до 5
             e.ToTable(t => t.HasCheckConstraint("CK_Reviews_Rating", "\"Rating\" BETWEEN 1 AND 5"));
+        });
+
+        b.Entity<ReviewPhoto>(e =>
+        {
+            e.Property(x => x.Url).HasMaxLength(300).IsRequired();
+
+            e.HasOne(x => x.Review)
+                .WithMany(x => x.Photos)
+                .HasForeignKey(x => x.ReviewId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => x.ReviewId);
+        });
+
+        b.Entity<PortfolioPhoto>(e =>
+        {
+            e.Property(x => x.Url).HasMaxLength(300).IsRequired();
+
+            e.HasOne(x => x.PortfolioItem)
+                .WithMany(x => x.Photos)
+                .HasForeignKey(x => x.PortfolioItemId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasIndex(x => x.PortfolioItemId);
+        });
+
+        b.Entity<WorkingHours>(e =>
+        {
+            e.HasOne(x => x.Performer)
+                .WithMany()
+                .HasForeignKey(x => x.PerformerId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // на один день недели одна запись
+            e.HasIndex(x => new { x.PerformerId, x.DayOfWeek }).IsUnique();
+
+            e.ToTable(t => t.HasCheckConstraint("CK_WorkingHours_DayOfWeek", "\"DayOfWeek\" BETWEEN 1 AND 7"));
+        });
+
+        b.Entity<PriceRequest>(e =>
+        {
+            e.Property(x => x.Title).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Description).HasMaxLength(2000).IsRequired();
+            e.Property(x => x.Address).HasMaxLength(500).IsRequired();
+            e.Property(x => x.ContactName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.ContactPhone).HasMaxLength(30).IsRequired();
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+
+            e.HasOne(x => x.Client)
+                .WithMany()
+                .HasForeignKey(x => x.ClientId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.Category)
+                .WithMany()
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasIndex(x => new { x.ClientId, x.CreatedAt });
+            e.HasIndex(x => new { x.Status, x.CategoryId });
+        });
+
+        b.Entity<PriceOffer>(e =>
+        {
+            e.Property(x => x.Price).HasPrecision(10, 2);
+            e.Property(x => x.Message).HasMaxLength(1000);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+
+            e.HasOne(x => x.Request)
+                .WithMany(x => x.Offers)
+                .HasForeignKey(x => x.RequestId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            e.HasOne(x => x.Performer)
+                .WithMany()
+                .HasForeignKey(x => x.PerformerId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.Service)
+                .WithMany()
+                .HasForeignKey(x => x.ServiceId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // один мастер — одно предложение по заявке (его можно менять)
+            e.HasIndex(x => new { x.RequestId, x.PerformerId }).IsUnique();
+            e.HasIndex(x => x.PerformerId);
+            e.HasIndex(x => x.ServiceId);
+
+            e.ToTable(t => t.HasCheckConstraint("CK_PriceOffers_Price", "\"Price\" > 0"));
         });
 
         b.Entity<PortfolioItem>(e =>

@@ -13,5 +13,8 @@ public class OrderStatusHistory
     public int ChangedByUserId { get; set; }
     public User ChangedByUser { get; set; } = null!;
 
+    // Причина: заполняется при отмене или отклонении заказа
+    public string? Reason { get; set; }
+
     public DateTime ChangedAt { get; set; } = DateTime.UtcNow;
 }
