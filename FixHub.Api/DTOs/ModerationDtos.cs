@@ -126,4 +126,13 @@ public class VerificationStatusDto
 {
     public bool IsVerified { get; set; }
     public List<VerificationDocumentDto> Documents { get; set; } = new();
+    public PerformerLimitsDto Limits { get; set; } = new();
+}
+
+// Что мастеру можно сейчас. Фронтенд показывает лимиты, а проверяет их всё равно сервер
+public class PerformerLimitsDto
+{
+    public int? MaxServices { get; set; }
+    public int MaxPortfolioItems { get; set; }
+    public bool CanSendOffers { get; set; }
 }

@@ -225,9 +225,12 @@ public class ScheduleRequestsAndReviewExtrasTests : IntegrationTestBase
     [Fact]
     public async Task Price_request_flow_creates_order_from_chosen_offer()
     {
-        var (performer1, _, service1, categoryId) = await PreparePerformerAsync();
-        var (performer2, _) = await RegisterAsync("Performer");
+        var (performer1, performer1Id, service1, categoryId) = await PreparePerformerAsync();
+        var (performer2, performer2Id) = await RegisterAsync("Performer");
         var service2 = await CreateServiceAsync(performer2, categoryId, 80);
+        // предложения по заявкам отправляют только проверенные мастера
+        await VerifyPerformerAsync(performer1Id);
+        await VerifyPerformerAsync(performer2Id);
         var (client, _) = await RegisterAsync("Client");
 
         var create = await Client.CallAsync(HttpMethod.Post, "/api/requests", new
@@ -308,7 +311,8 @@ public class ScheduleRequestsAndReviewExtrasTests : IntegrationTestBase
     [Fact]
     public async Task Request_can_be_cancelled_and_offer_withdrawn()
     {
-        var (performer, _, service, categoryId) = await PreparePerformerAsync();
+        var (performer, performerId, service, categoryId) = await PreparePerformerAsync();
+        await VerifyPerformerAsync(performerId);
         var (client, _) = await RegisterAsync("Client");
 
         var request = await (await Client.CallAsync(HttpMethod.Post, "/api/requests", new

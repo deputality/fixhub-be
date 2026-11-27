@@ -370,6 +370,10 @@ public class PriceRequestsController : ControllerBase
     {
         var userId = CurrentUserId;
 
+        var isVerified = await _db.Users.Where(u => u.Id == userId).Select(u => u.IsVerified).FirstAsync();
+        if (!PerformerLimits.For(isVerified).CanSendOffers)
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = PerformerLimits.OffersMessage });
+
         var request = await _db.PriceRequests
             .Include(r => r.Client)
             .FirstOrDefaultAsync(r => r.Id == id);

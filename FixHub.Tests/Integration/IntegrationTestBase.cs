@@ -55,6 +55,14 @@ public abstract class IntegrationTestBase
         return (await response.ReadAsync<AuthResponse>()).Token;
     }
 
+    // Администратор отмечает мастера проверенным (с лимитов непроверенного мастера снимаются)
+    protected async Task VerifyPerformerAsync(int performerId)
+    {
+        var admin = await LoginAdminAsync();
+        var response = await Client.CallAsync(HttpMethod.Post, $"/api/admin/users/{performerId}/verify", token: admin);
+        response.EnsureSuccessStatusCode();
+    }
+
     protected async Task<int> CreateCategoryAsync()
     {
         var admin = await LoginAdminAsync();

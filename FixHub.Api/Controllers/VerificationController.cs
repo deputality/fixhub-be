@@ -1,6 +1,7 @@
 ﻿using FixHub.Api.Data;
 using FixHub.Api.DTOs;
 using FixHub.Api.Models;
+using FixHub.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -40,10 +41,18 @@ public class VerificationController : ControllerBase
     public async Task<ActionResult<VerificationStatusDto>> GetMine()
     {
         var userId = CurrentUserId;
+        var isVerified = await _db.Users.Where(u => u.Id == userId).Select(u => u.IsVerified).FirstAsync();
+        var limits = PerformerLimits.For(isVerified);
         return Ok(new VerificationStatusDto
         {
-            IsVerified = await _db.Users.Where(u => u.Id == userId).Select(u => u.IsVerified).FirstAsync(),
-            Documents = await LoadDocuments(userId)
+            IsVerified = isVerified,
+            Documents = await LoadDocuments(userId),
+            Limits = new PerformerLimitsDto
+            {
+                MaxServices = limits.MaxServices == int.MaxValue ? null : limits.MaxServices,
+                MaxPortfolioItems = limits.MaxPortfolioItems,
+                CanSendOffers = limits.CanSendOffers
+            }
         });
     }
 

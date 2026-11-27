@@ -1,6 +1,7 @@
 using FixHub.Api.Data;
 using FixHub.Api.DTOs;
 using FixHub.Api.Models;
+using FixHub.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,7 +15,6 @@ namespace FixHub.Api.Controllers;
 [Authorize(Roles = "Performer")]
 public class PortfolioController : ControllerBase
 {
-    private const int MaxItems = 30;
     private const int MaxExtraPhotos = 10;
     private const string UploadsPrefix = "/uploads/";
 
@@ -51,8 +51,16 @@ public class PortfolioController : ControllerBase
         if (error != null)
             return BadRequest(new { error });
 
-        if (await _db.PortfolioItems.CountAsync(p => p.PerformerId == userId) >= MaxItems)
-            return BadRequest(new { error = $"В портфолио не больше {MaxItems} работ" });
+        var isVerified = await _db.Users.Where(u => u.Id == userId).Select(u => u.IsVerified).FirstAsync();
+        var limits = PerformerLimits.For(isVerified);
+
+        if (await _db.PortfolioItems.CountAsync(p => p.PerformerId == userId) >= limits.MaxPortfolioItems)
+            return StatusCode(StatusCodes.Status403Forbidden, new
+            {
+                error = isVerified
+                    ? $"В портфолио не больше {limits.MaxPortfolioItems} работ"
+                    : PerformerLimits.PortfolioMessage(limits.MaxPortfolioItems)
+            });
 
         var item = new PortfolioItem
         {

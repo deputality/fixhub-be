@@ -1,6 +1,7 @@
 ﻿using FixHub.Api.Data;
 using FixHub.Api.DTOs;
 using FixHub.Api.Models;
+using FixHub.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -42,6 +43,10 @@ public class PerformerServicesController : ControllerBase
     {
         if (!await _db.Categories.AnyAsync(c => c.Id == request.CategoryId))
             return BadRequest(new { error = "Категория не найдена" });
+
+        var limitError = await CheckServicesLimitAsync(activeOnly: false);
+        if (limitError != null)
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = limitError });
 
         var service = new Service
         {
@@ -101,10 +106,30 @@ public class PerformerServicesController : ControllerBase
         if (service == null)
             return NotFound(new { error = "Услуга не найдена" });
 
+        // иначе лимит обходится: создали, скрыли, создали ещё, показали все
+        if (isActive && !service.IsActive)
+        {
+            var limitError = await CheckServicesLimitAsync(activeOnly: true);
+            if (limitError != null)
+                return StatusCode(StatusCodes.Status403Forbidden, new { error = limitError });
+        }
+
         service.IsActive = isActive;
         await _db.SaveChangesAsync();
 
         return Ok(ToDto(service));
+    }
+
+    // Лимит услуг для непроверенного мастера. При создании считаем все услуги (скрытые тоже),
+    // при показе скрытой услуги только опубликованные
+    private async Task<string?> CheckServicesLimitAsync(bool activeOnly)
+    {
+        var userId = CurrentUserId;
+        var isVerified = await _db.Users.Where(u => u.Id == userId).Select(u => u.IsVerified).FirstAsync();
+        var limits = PerformerLimits.For(isVerified);
+
+        var count = await _db.Services.CountAsync(s => s.PerformerId == userId && (!activeOnly || s.IsActive));
+        return count >= limits.MaxServices ? PerformerLimits.ServicesMessage(limits.MaxServices) : null;
     }
 
     // Ищет услугу среди СВОИХ: чужая услуга для исполнителя «не существует»
