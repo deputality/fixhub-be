@@ -2,6 +2,7 @@
 using FixHub.Api.Common;
 using FixHub.Api.Data;
 using FixHub.Api.Models;
+using FixHub.Api.Hubs;
 using FixHub.Api.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -92,6 +93,17 @@ try
 
             options.Events = new JwtBearerEvents
             {
+                // Браузер не умеет добавлять заголовки при открытии WebSocket, поэтому для чата
+                // токен приходит в адресе (?access_token=...). Принимаем его только для /hubs
+                OnMessageReceived = ctx =>
+                {
+                    var token = ctx.Request.Query["access_token"];
+                    if (!string.IsNullOrEmpty(token) && ctx.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                        ctx.Token = token;
+
+                    return Task.CompletedTask;
+                },
+
                 OnTokenValidated = async ctx =>
                 {
                     var db = ctx.HttpContext.RequestServices.GetRequiredService<AppDbContext>();
@@ -117,6 +129,9 @@ try
 
     builder.Services.AddAuthorization();
 
+    // WebSocket-чат (SignalR): сообщения, «прочитано», «печатает» и значки приходят без опроса сервера
+    builder.Services.AddSignalR();
+
     // CORS: нужен, когда фронтенд открыт с другого адреса, чем API (в разработке запросы идут через прокси Vite).
     // Разрешённые адреса задаются в Cors:AllowedOrigins, по умолчанию разрешён только App:BaseUrl
     var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
@@ -132,6 +147,7 @@ try
     builder.Services.AddScoped<ITokenService, TokenService>();
     builder.Services.AddScoped<INotificationService, NotificationService>();
     builder.Services.AddScoped<IAuditService, AuditService>();
+    builder.Services.AddScoped<IChatService, ChatService>();
     builder.Services.AddSingleton<IEmailSender, SmtpEmailSender>();
     builder.Services.AddSingleton<ILoginThrottle, LoginThrottle>();
     builder.Services.AddHostedService<EmailNotificationWorker>();
@@ -190,6 +206,9 @@ try
     app.UseAuthorization();
 
     app.MapControllers();
+
+    // Адрес для WebSocket-подключения чата; соединение закрывается, когда истекает токен
+    app.MapHub<ChatHub>("/hubs/chat", options => options.CloseOnAuthenticationExpiration = true);
 
     // Проверка «приложение живо и база отвечает»: для Docker healthcheck и ручной проверки (http://localhost:8080/health)
     app.MapGet("/health", async (AppDbContext db, CancellationToken ct) =>

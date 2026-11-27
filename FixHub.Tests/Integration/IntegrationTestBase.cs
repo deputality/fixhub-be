@@ -8,11 +8,14 @@ public abstract class IntegrationTestBase
 
     protected HttpClient Client { get; }
 
+    protected ApiFixture Fixture { get; }
+
     // Письма, которые «отправило» приложение во время теста
     protected FakeEmailSender Emails { get; }
 
     protected IntegrationTestBase(ApiFixture fixture)
     {
+        Fixture = fixture;
         Client = fixture.Client;
         Emails = fixture.Emails;
     }

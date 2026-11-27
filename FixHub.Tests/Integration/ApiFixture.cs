@@ -22,6 +22,9 @@ public class ApiFixture : IAsyncLifetime
 
     public HttpClient Client { get; private set; } = null!;
 
+    // Для WebSocket-тестов: соединения с SignalR идут в то же запущенное приложение
+    public HttpMessageHandler CreateHandler() => _factory.Server.CreateHandler();
+
     // Вместо настоящей почты письма собираются здесь: из них тесты берут ссылку для сброса пароля
     public FakeEmailSender Emails { get; } = new();
 
