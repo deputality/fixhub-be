@@ -16,12 +16,15 @@ public class ReviewsController : ControllerBase
     private readonly AppDbContext _db;
     private readonly ILogger<ReviewsController> _logger;
     private readonly INotificationService _notifications;
+    private readonly IRealtimeNotifier _realtime;
 
-    public ReviewsController(AppDbContext db, ILogger<ReviewsController> logger, INotificationService notifications)
+    public ReviewsController(
+        AppDbContext db, ILogger<ReviewsController> logger, INotificationService notifications, IRealtimeNotifier realtime)
     {
         _db = db;
         _logger = logger;
         _notifications = notifications;
+        _realtime = realtime;
     }
 
     private const int MaxPhotos = 3;
@@ -110,6 +113,7 @@ public class ReviewsController : ControllerBase
             $"Новый отзыв с оценкой {review.Rating}",
             reviewId: review.Id);
         await _db.SaveChangesAsync();
+        await _realtime.NotificationsChangedAsync(item.PerformerId);
 
         _logger.LogInformation(
             "Клиент {ClientId} оставил отзыв {ReviewId} на услугу {ServiceId}, оценка {Rating}",
@@ -213,6 +217,9 @@ public class ReviewsController : ControllerBase
                 reviewId: review.Id);
 
         await _db.SaveChangesAsync();
+
+        if (isNew)
+            await _realtime.NotificationsChangedAsync(review.ClientId);
 
         return Ok(await LoadAsync(id));
     }

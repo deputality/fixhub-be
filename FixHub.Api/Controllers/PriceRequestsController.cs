@@ -17,13 +17,16 @@ public class PriceRequestsController : ControllerBase
     private readonly AppDbContext _db;
     private readonly ILogger<PriceRequestsController> _logger;
     private readonly INotificationService _notifications;
+    private readonly IRealtimeNotifier _realtime;
 
     public PriceRequestsController(
-        AppDbContext db, ILogger<PriceRequestsController> logger, INotificationService notifications)
+        AppDbContext db, ILogger<PriceRequestsController> logger, INotificationService notifications,
+        IRealtimeNotifier realtime)
     {
         _db = db;
         _logger = logger;
         _notifications = notifications;
+        _realtime = realtime;
     }
 
     private int CurrentUserId => int.Parse(User.FindFirst("sub")!.Value);
@@ -293,6 +296,8 @@ public class PriceRequestsController : ControllerBase
         await _db.SaveChangesAsync();
         await tx.CommitAsync();
 
+        await _realtime.OrderChangedAsync(order.Id, offer.PerformerId, userId);
+
         _logger.LogInformation("Клиент {ClientId} выбрал предложение {OfferId} по заявке {RequestId}, заказ {OrderId}",
             userId, offer.Id, request.Id, order.Id);
 
@@ -365,6 +370,10 @@ public class PriceRequestsController : ControllerBase
     {
         var userId = CurrentUserId;
 
+        var isVerified = await _db.Users.Where(u => u.Id == userId).Select(u => u.IsVerified).FirstAsync();
+        if (!PerformerLimits.For(isVerified).CanSendOffers)
+            return StatusCode(StatusCodes.Status403Forbidden, new { error = PerformerLimits.OffersMessage });
+
         var request = await _db.PriceRequests
             .Include(r => r.Client)
             .FirstOrDefaultAsync(r => r.Id == id);
@@ -431,6 +440,7 @@ public class PriceRequestsController : ControllerBase
                 $"Новое предложение по заявке «{Short(request.Title)}»: {offer.Price:0.##}",
                 requestId: request.Id);
             await _db.SaveChangesAsync();
+            await _realtime.NotificationsChangedAsync(request.ClientId);
         }
 
         var dto = await _db.PriceOffers.AsNoTracking()

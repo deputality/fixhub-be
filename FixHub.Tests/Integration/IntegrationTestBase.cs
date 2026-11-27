@@ -8,11 +8,14 @@ public abstract class IntegrationTestBase
 
     protected HttpClient Client { get; }
 
+    protected ApiFixture Fixture { get; }
+
     // Письма, которые «отправило» приложение во время теста
     protected FakeEmailSender Emails { get; }
 
     protected IntegrationTestBase(ApiFixture fixture)
     {
+        Fixture = fixture;
         Client = fixture.Client;
         Emails = fixture.Emails;
     }
@@ -50,6 +53,14 @@ public abstract class IntegrationTestBase
 
         response.EnsureSuccessStatusCode();
         return (await response.ReadAsync<AuthResponse>()).Token;
+    }
+
+    // Администратор отмечает мастера проверенным (с лимитов непроверенного мастера снимаются)
+    protected async Task VerifyPerformerAsync(int performerId)
+    {
+        var admin = await LoginAdminAsync();
+        var response = await Client.CallAsync(HttpMethod.Post, $"/api/admin/users/{performerId}/verify", token: admin);
+        response.EnsureSuccessStatusCode();
     }
 
     protected async Task<int> CreateCategoryAsync()

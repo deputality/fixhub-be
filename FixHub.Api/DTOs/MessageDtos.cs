@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace FixHub.Api.DTOs;
 
@@ -26,4 +26,14 @@ public class UnreadChatDto
 {
     public int OrderId { get; set; }
     public int Count { get; set; }
+}
+
+// Ответ на отправку сообщения через WebSocket: вместо исключения возвращаем код и текст ошибки,
+// чтобы клиент показал понятное сообщение (как при обычном запросе)
+public class ChatSendResultDto
+{
+    public bool Ok { get; set; }
+    public int Status { get; set; } = 200;
+    public string? Error { get; set; }
+    public OrderMessageDto? Message { get; set; }
 }
