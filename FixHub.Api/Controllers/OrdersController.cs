@@ -17,12 +17,15 @@ public class OrdersController : ControllerBase
     private readonly AppDbContext _db;
     private readonly ILogger<OrdersController> _logger;
     private readonly INotificationService _notifications;
+    private readonly IRealtimeNotifier _realtime;
 
-    public OrdersController(AppDbContext db, ILogger<OrdersController> logger, INotificationService notifications)
+    public OrdersController(
+        AppDbContext db, ILogger<OrdersController> logger, INotificationService notifications, IRealtimeNotifier realtime)
     {
         _db = db;
         _logger = logger;
         _notifications = notifications;
+        _realtime = realtime;
     }
 
     private int CurrentUserId => int.Parse(User.FindFirst("sub")!.Value);
@@ -145,6 +148,10 @@ public class OrdersController : ControllerBase
         await _db.SaveChangesAsync();
         await tx.CommitAsync();
 
+        // мастер сразу видит новый заказ, не обновляя страницу
+        foreach (var order in orders)
+            await _realtime.OrderChangedAsync(order.Id, order.PerformerId, userId);
+
         _logger.LogInformation(
             "Клиент {ClientId} оформил заказы {OrderIds} на сумму {Total}",
             userId,
@@ -214,6 +221,8 @@ public class OrdersController : ControllerBase
             order.Id);
 
         await _db.SaveChangesAsync();
+
+        await _realtime.OrderChangedAsync(order.Id, order.PerformerId, userId);
 
         _logger.LogInformation(
             "Клиент {ClientId} заказал услугу {ServiceId} напрямую, заказ {OrderId} на сумму {Total}",
@@ -536,6 +545,9 @@ public class OrdersController : ControllerBase
 
         await _db.SaveChangesAsync();
         await tx.CommitAsync();
+
+        // и клиент, и мастер (в том числе в других вкладках) видят новый статус сразу
+        await _realtime.OrderChangedAsync(id, order.ClientId, order.PerformerId);
 
         _logger.LogInformation(
             "Заказ {OrderId}: статус {From} -> {To}, изменил пользователь {UserId}",

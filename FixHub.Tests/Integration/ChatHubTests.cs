@@ -58,6 +58,40 @@ public class ChatHubTests : IntegrationTestBase
     }
 
     [Fact]
+    public async Task New_order_reaches_the_performer_without_reloading_the_page()
+    {
+        var categoryId = await CreateCategoryAsync();
+        var (performer, _) = await RegisterAsync("Performer");
+        var service = await CreateServiceAsync(performer, categoryId);
+        var (client, _) = await RegisterAsync("Client");
+
+        await using var hub = await ConnectAsync(performer);
+        var changed = new TaskCompletionSource<int>();
+        hub.On<OrdersChangedEvent>("OrdersChanged", e => changed.TrySetResult(e.OrderId));
+
+        Assert.Equal(HttpStatusCode.OK, (await AddToCartAsync(client, service.Id)).StatusCode);
+        var checkout = await CheckoutAsync(client);
+        var order = Assert.Single(await checkout.ReadAsync<List<OrderDto>>());
+
+        Assert.Equal(order.Id, await FirstAsync(changed));
+    }
+
+    [Fact]
+    public async Task Confirming_an_order_is_pushed_to_the_client_instantly()
+    {
+        var (performer, client, order) = await CreateOrderAsync();
+
+        await using var hub = await ConnectAsync(client);
+        var changed = new TaskCompletionSource<int>();
+        hub.On<OrdersChangedEvent>("OrdersChanged", e => changed.TrySetResult(e.OrderId));
+
+        var confirmed = await Client.CallAsync(HttpMethod.Post, $"/api/orders/{order.Id}/confirm", token: performer);
+        Assert.Equal(HttpStatusCode.OK, confirmed.StatusCode);
+
+        Assert.Equal(order.Id, await FirstAsync(changed));
+    }
+
+    [Fact]
     public async Task Message_sent_by_request_reaches_the_other_party_instantly()
     {
         var (performer, client, order) = await CreateOrderAsync();
@@ -167,4 +201,5 @@ public class ChatHubTests : IntegrationTestBase
     private record UnreadChange(int OrderId, int Count);
 
     private record ReadReceipt(int OrderId, int ReaderId);
+    private record OrdersChangedEvent(int OrderId);
 }

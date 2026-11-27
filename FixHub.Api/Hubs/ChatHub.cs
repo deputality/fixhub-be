@@ -14,6 +14,7 @@ namespace FixHub.Api.Hubs;
 //   UserTyping({ orderId, userId })   собеседник печатает
 //   UnreadChanged({ orderId, count }) сколько непрочитанных в чате (для значков)
 //   NotificationsChanged              появилось или прочиталось уведомление
+//   OrdersChanged({ orderId })        заказ создан или сменил статус: пора обновить список заказов
 [Authorize(Roles = "Client,Performer")]
 public class ChatHub : Hub
 {
